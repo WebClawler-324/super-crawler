@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>京东搜索</title>
+</head>
+<body>
+<script>
+// 设置Cookie的函数
+function setCookies() {
+    // 从您提供的Cookie中提取关键部分
+    const cookieList = [
+        "__jdv=76161171|direct|-|none|-|1765517374914; domain=.jd.com; path=/",
+        "__jdu=17655173749131810095648; domain=.jd.com; path=/",
+        "pin=jd_lCpwaiFspXEC; domain=.jd.com; path=/",
+        "pinId=8SHaZmgmZP84BXEb1KPk3Q; domain=.jd.com; path=/",
+        "unick=gt9ar424jr5si7; domain=.jd.com; path=/",
+        "_tp=a%2FUzM1R%2FwEJUYWCy9w7LjA%3D%3D; domain=.jd.com; path=/",
+        "areaId=1; domain=.jd.com; path=/",
+        "ipLoc-djd=1-2800-0-0; domain=.jd.com; path=/",
+        "shshshfpa=79f2f482-2adb-cfa9-8197-cab37da61882-1765517377; domain=.jd.com; path=/",
+        "TrackID=16ENJG0OUgFW3Q-1MglFfjfwjAV3m_MhIFZLgQvGXGzJec2Y7fymrYHz4NPktzFJLwqb0uYDn2p-c4cx39CSpuhNEQ6u4xSSGJe_aC9bE4Sg; domain=.jd.com; path=/",
+        "thor=E4562D1B207C4E00E6BE63D58301562B6632A8B40A2AC1DEA4F8AD29C8A09172171DEB4053BC58E1394B7FE9B627CADF5698A5D84F769E25B30493D19B67B98F96D2A20747851E5CCB7A2D72041E6130DABA0598FE4C256D176C0EB7EFB9C848D6EFDA09A0F166478827DA01E6322F96F2C25908048737E3DEBF16977F5C94BFF38E799519F0F76444DAC387FCC138D65E529E22E5138F20C883874A31928022; domain=.jd.com; path=/",
+        "__jda=76161171.17655173749131810095648.1765517375.1765517375.1765517375.1; domain=.jd.com; path=/",
+        "guid=965dd2925aed68a95c0c4a2eaa5afbd31cc7bc691713aac21051244f36274033; domain=.jd.com; path=/",
+        "sdtoken=AAbEsBpEIOVjqTAKCQtvQu17g0Qv2JriNuiZA95x-t0HAHPnn1wJFBuZ1vudCTQqXHHrsWM9KL2BTfJH-xuybFoFCzKWhfFKCTQu7w5rBbmFczdLGOwygezCx96YI5Hsx4S5Olzo0QiVVoSGhlKaqS0KJRu8zg; domain=.jd.com; path=/"
+    ];
+
+    // 设置每个Cookie
+    cookieList.forEach(cookieStr => {
+        document.cookie = cookieStr;
+    });
+
+    console.log("Cookie设置完成，准备跳转...");
+
+    // 延迟跳转，确保Cookie生效
+    setTimeout(() => {
+        window.location.href = "https://search.jd.com/Search?keyword=MacPro&enc=utf-8&wq=MacPro&page=1";
+    }, 1000);
+}
+
+// 页面加载时执行
+window.onload = function() {
+    setCookies();
+};
+</script>
+<p>正在设置Cookie并跳转到京东搜索页...</p>
+</body>
+</html>
