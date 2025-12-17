@@ -16,6 +16,12 @@
 #include <QStringEncoder>
 #include <QFile>
 #include <QTextStream>
+#include<QChar>
+// 在 Crawl.cpp 最顶部添加以下头文件
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QMetaObject> // 同时添加这个，解决 invokeMethod 的头文件依赖
 
 // ===================== 类内静态常量初始化（不变）=====================
 const int Crawl::REQUEST_INTERVAL = 3000;
@@ -114,7 +120,7 @@ void Crawl::simulateHumanBehavior() { // 去掉 ui 参数
 }
 
 // ===================== Cookie管理函数（修正：用 m_ui + 信号）=====================
-void Crawl::loadCookiesFromFile(const QString& filePath) { // 去掉 ui 参数
+void Crawl::loadCookiesFromFile(const QString& filePath) {
     QFile file(filePath.isEmpty() ? "ke_cookies.txt" : filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         emit appendLogSignal(QString("⚠️ Cookie文件加载失败：%1（将使用默认Cookie）").arg(file.fileName()));
@@ -181,6 +187,11 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     , currentPageCount(0)
     , targetPageCount(1)
 {
+    //初始化数据库类对象
+    mysql=new Mysql();
+    //连接数据库
+    mysql->connectDatabase();
+
     // webPage 初始化（兜底，避免空指针）
     if (webPageParam != nullptr) {
         webPage = webPageParam;
@@ -227,6 +238,8 @@ Crawl::~Crawl() {
     urlDepth.clear();
     houseDataList.clear();
     houseIdSet.clear();
+    //与数据库断联
+    mysql->close();
 
     emit appendLogSignal("🔌 Crawl 实例已安全销毁，资源释放完成");
 }
@@ -445,63 +458,94 @@ void Crawl::extractHouseData(const QString& html)
        emit appendLogSignal(QString("\n📌 房源标题：%1").arg(title));
 
 
-        // 👉 2. 小区名提取（放弃多余判断，直接抓 a 标签文本）
-        // 第一步：拿到 div.positionInfo 完整内容（已验证100%成功）
-        QRegularExpression posInfoRegex(R"(<div\s+class=["']positionInfo["']([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch posInfoMatch = posInfoRegex.match(houseHtml);
-        if (!posInfoMatch.hasMatch()) {
+       // 👉 2. 小区名提取（放弃多余判断，直接抓 a 标签文本）
+       // 第一步：匹配 positionInfo 容器 + 预处理（移除干扰标签）
+       // 👉 前提：确保 houseHtml 是 QString::fromUtf8() 解码的 UTF-8 字符串！
+       // 1. 匹配 positionInfo 容器 + 预处理（移除span干扰）
+       QRegularExpression posInfoRegex(R"(<div\s+class=["']positionInfo["']([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
+       QRegularExpressionMatch posInfoMatch = posInfoRegex.match(houseHtml);
+       if (!posInfoMatch.hasMatch()) {
            emit appendLogSignal("❌ 未找到 div.positionInfo 容器");
-            continue;
-        }
-        QString posInfoHtml = posInfoMatch.captured(0).trimmed();
-        //ui->textEdit->append(QString("✅ 已拿到 positionInfo：\n%1").arg(posInfoHtml));
+           continue;
+       }
+       QString posInfoHtml = posInfoMatch.captured(0).trimmed();
+       posInfoHtml.remove(QRegularExpression(R"(<span[^>]*>.*?</span>)")); // 移除span标签
 
-        // 第二步：直接提取 positionInfo 内第一个 a 标签的文本（不校验 href！）
-        // 核心：你已经确认小区名就在这个 a 标签里，不用再判断链接
-        QRegularExpression aTagRegex(
-            R"(<a\s+.*?>([\u4e00-\u9fa5\s·-（）()0-9a-zA-Z]+)</a>)",
-            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
-            );
-        QRegularExpressionMatch aTagMatch = aTagRegex.match(posInfoHtml);
-        if (aTagMatch.hasMatch()) {
-            communityName = aTagMatch.captured(1).trimmed();
-            communityName.replace(QRegularExpression(R"(\s+)"), " "); // 清除多余空格/缩进
+       // 2. 核心正则：匹配<a...>后到</a>前的所有内容（精准截断，保留特殊字符）
+       QRegularExpression aTagRegex(
+           R"(<a\s+[^>]*>([\s\S]*?)</a>)", // 非贪婪匹配：<a>后 → </a>前的所有内容
+           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+           );
+       QRegularExpressionMatch aTagMatch = aTagRegex.match(posInfoHtml);
+
+       if (aTagMatch.hasMatch()) {
+           QString rawName = aTagMatch.captured(1).trimmed();
+           // 过滤规则修改：保留「•」「-」「()」等合法字符，只移除引号/空格
+           communityName = rawName
+                               .remove(QRegularExpression(R"(\s+)"))       // 移除多余空格
+                               .replace("“", "").replace("”", "")          // 移除中文引号
+                               .replace("\"", "").replace("'", "");         // 移除英文引号
+           // 👉 关键：不再过滤「•」，保留小区名中的合法特殊字符
+       } else {
+           // 兜底逻辑：精准找</a>位置并截断
+           int aTagStart = posInfoHtml.indexOf("<a");
+           if (aTagStart == -1) {
+               emit appendLogSignal("❌ positionInfo 内无 a 标签");
+               continue;
+           }
+           int aTagClose = posInfoHtml.indexOf(">", aTagStart);
+           int aTagEnd = posInfoHtml.indexOf("</a>", aTagClose); // 找</a>位置
+           if (aTagClose == -1 || aTagEnd == -1) {
+               emit appendLogSignal("❌ a 标签格式异常");
+               continue;
+           }
+           // 截取<a>后 → </a>前的内容
+           QString temp = posInfoHtml.mid(aTagClose + 1, aTagEnd - aTagClose - 1).trimmed();
+           // 同样保留「•」，只清理冗余
+           temp = temp.remove(QRegularExpression(R"(\s+)")).replace("“", "").replace("”", "").replace("\"", "");
+           if (!temp.isEmpty()) {
+               communityName = temp;
+           } else {
+               emit appendLogSignal("❌ 未找到 a 标签内的有效文本");
+           }
+       }
+
+       // 最终输出（此时communityName应为「观澜湖•九里」，无乱码）
+       if (!communityName.isEmpty()) {
            emit appendLogSignal(QString("✅ 小区名提取成功：%1").arg(communityName));
-        } else {
-            // 极端兜底：逐字符查找 a 标签的 > 和 </a> 之间的内容（规避正则匹配问题）
-            int startIdx = posInfoHtml.indexOf(">");
-            int endIdx = posInfoHtml.lastIndexOf("</a>");
-            if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
-                QString temp = posInfoHtml.mid(startIdx + 1, endIdx - startIdx - 1).trimmed();
-                // 过滤掉非中文/字母/数字的无效字符
-                temp.replace(QRegularExpression(R"([^\u4e00-\u9fa5\s·-（）()0-9a-zA-Z])"), "");
-                if (!temp.isEmpty()) {
-                    communityName = temp.replace(QRegularExpression(R"(\s+)"), " ");
-                    // ui->textEdit->append(QString("✅ 兜底（字符截取）成功：小区名=%1").arg(communityName));
-                } else {
-                    emit appendLogSignal("❌ 未找到 a 标签内的有效文本");
-                }
-            } else {
-                emit appendLogSignal("❌ positionInfo 内无 a 标签");
-            }
-        }
+       } else {
+           emit appendLogSignal("❌ 小区名提取失败");
+       }
+       // 👉 3. 提取总价（支持整数/小数）
+       QRegularExpression totalPriceRegex(
+           R"(<div\s+class=["']totalPrice totalPrice2["']>.*?<span\s+class=["']*["']>(\s*[\d.]+)\s*</span>.*?<i>万</i>.*?</div>)",
+           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+           );
+       QRegularExpressionMatch priceMatch = totalPriceRegex.match(houseHtml); // 只匹配一次，提升效率
+       if (priceMatch.hasMatch()) {
+           QString priceNum = priceMatch.captured(1).trimmed(); // 捕获267.9
+           totalPrice = priceNum + " 万"; // 拼接为"267.9 万"
+           // 可选：转成数值类型（如double）
+           // double priceVal = priceNum.toDouble();
+       } else {
+           emit appendLogSignal("❌ 总价提取失败");
+       }
 
 
-        // 👉 3. 提取总价
-        QRegularExpression totalPriceRegex(
-            R"(<div\s+class=["']totalPrice totalPrice2["']\s*>\s*<i></i>\s*<span\s+class=["']["']\s*>(\s*\d+)\s*</span>\s*<i>万</i>\s*</div>)",
-            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
-            );
-        if (totalPriceRegex.match(houseHtml).hasMatch()) {
-            totalPrice = totalPriceRegex.match(houseHtml).captured(1).trimmed() + " 万";
-        }
-
-
-        // 👉 4. 提取单价
-        QRegularExpression unitPriceRegex(R"(<span\s+.*?>([\d,]+)元/平</span>)", QRegularExpression::DotMatchesEverythingOption);
-        if (unitPriceRegex.match(houseHtml).hasMatch()) {
-            unitPrice = unitPriceRegex.match(houseHtml).captured(1).trimmed() + " 元/㎡";
-        }
+       // 👉 4. 提取单价（修复span标签匹配问题，兼容无空格/无属性的span）
+       QRegularExpression unitPriceRegex(
+           R"(<span\s*[^>]*>\s*([\d,.]+)\s*(元/平|元/㎡)</span>)",  // 关键：\s+ → \s*
+           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+           );
+       QRegularExpressionMatch unitPriceMatch = unitPriceRegex.match(houseHtml);
+       if (unitPriceMatch.hasMatch()) {
+           QString priceNum = unitPriceMatch.captured(1).trimmed(); // 捕获16,056
+           unitPrice = priceNum + " 元/㎡"; // 最终：16,056 元/㎡
+           // 可选：清理逗号转数值（存入数据库用）
+           // double unitPriceVal = priceNum.remove(",").toDouble();
+       } else {
+           emit appendLogSignal("❌ 单价提取失败");
+       }
 
 
         // 👉 5. 提取楼层/建筑年代/户型/面积/朝向（按关键词识别，无视顺序）
@@ -533,7 +577,9 @@ void Crawl::extractHouseData(const QString& html)
             QRegularExpressionMatch floorMatch = floorRegex.match(cleanHouseInfo);
             if (floorMatch.hasMatch()) {
                 floor = floorMatch.captured(0).trimmed();
-                emit appendLogSignal(QString("✅ 匹配楼层：%1").arg(floor));
+                //清理楼层的空格间距
+                floor = floor.replace(QRegularExpression(R"(\s+)"), "");
+                emit appendLogSignal(QString("✅楼层：%1").arg(floor));
             } else {
                 // 兜底：匹配无“共X层”的情况（如“底层”“高楼层”）
                 QRegularExpression floorSimpleRegex(R"(底层|顶层|低楼层|中楼层|高楼层)");
@@ -547,7 +593,7 @@ void Crawl::extractHouseData(const QString& html)
             QRegularExpression houseTypeRegex(R"(\d+室\d+厅)", QRegularExpression::CaseInsensitiveOption);
             if (houseTypeRegex.match(cleanHouseInfo).hasMatch()) {
                 houseType = houseTypeRegex.match(cleanHouseInfo).captured(0);
-                emit appendLogSignal(QString("✅ 匹配户型：%1").arg(houseType));
+                emit appendLogSignal(QString("✅户型：%1").arg(houseType));
             }
 
             // 2.3 匹配“面积”（格式：数字+平米，支持整数/小数）
@@ -555,14 +601,14 @@ void Crawl::extractHouseData(const QString& html)
             if (areaRegex.match(cleanHouseInfo).hasMatch()) {
                 QString areaNum = areaRegex.match(cleanHouseInfo).captured(1);
                 area = areaNum + " ㎡";
-                emit appendLogSignal(QString("✅ 匹配面积：%1").arg(area));
+                emit appendLogSignal(QString("✅面积：%1").arg(area));
             }
 
             // 2.4 匹配“建筑年代”（格式：4位数字+年）
             QRegularExpression yearRegex(R"(\d{4}年)", QRegularExpression::CaseInsensitiveOption);
             if (yearRegex.match(cleanHouseInfo).hasMatch()) {
                 buildingYear = yearRegex.match(cleanHouseInfo).captured(0);
-                emit appendLogSignal(QString("✅ 匹配建筑年代：%1").arg(buildingYear));
+                emit appendLogSignal(QString("✅建筑年代：%1").arg(buildingYear));
             }
 
             // 2.5 匹配“朝向”（方向词组合：南/北/东/西等，去重合并）
@@ -575,7 +621,7 @@ void Crawl::extractHouseData(const QString& html)
             }
             orientation = dirResult.trimmed().isEmpty() ? "未知" : dirResult.trimmed();
             if (orientation != "未知") {
-                emit appendLogSignal(QString("✅ 匹配朝向：%1").arg(orientation));
+                emit appendLogSignal(QString("✅朝向：%1").arg(orientation));
             }
 
 
@@ -617,6 +663,7 @@ void Crawl::extractHouseData(const QString& html)
     }
 
     emit appendLogSignal(QString("\n📊 提取完成：共%1条有效房源").arg(extractCount));
+
 }
 
 
@@ -723,6 +770,8 @@ void Crawl::showHouseCompareResult()
                 totalPriceSum += price;
                 validPriceCount++;
             }
+            //插入数据到数据库
+            mysql->insertInfo(house);
         }
 
         if (validPriceCount > 0) {
@@ -815,3 +864,11 @@ void Crawl::startHouseCrawl(const QString& city, int targetPages)
     isHomeLoadedForSearch = true; // Crawl 类内成员：首页加载标志
     pendingSearchKeyword = currentCity; // Crawl 类内成员：待搜索关键词
 }
+
+/*void Crawl::IntoDB()
+{
+    for(const auto& data: houseDataList){
+        mysql->insertInfo(data);
+    }
+}*/
+
