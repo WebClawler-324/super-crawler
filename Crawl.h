@@ -8,12 +8,14 @@
 #include <QMap>
 #include <QList>
 #include <QStringList>
+#include "MYSQL.h"
 
 // 关键修正1：避免循环包含 + 正确前向声明
 class MainWindow; // 前向声明 MainWindow（仅用指针，不包含头文件）
 namespace Ui { class MainWindow; } // 前向声明 UI 命名空间（替代 #include "ui_mainwindow.h"）
 
 #include "HouseData.h" // 包含房源数据结构体（必须在前面声明之后）
+#include "LLMClient.h"
 
 class Crawl : public QObject
 {
@@ -48,6 +50,14 @@ private:
 
     // 搜索任务标志位（直接初始化）
     bool isProcessingSearchTask = false;
+
+    //添加 LLMClient 成员变量（大模型客户端）
+    LLMClient *m_llmClient;
+
+    //把房子数据写入数据库
+    Mysql *mysql;
+    void IntoDB();
+
 public:
     // 构造函数（参数不变，保持与实现一致）
     explicit Crawl(MainWindow *mainWindow, QWebEnginePage *webPage, Ui::MainWindow* ui);
