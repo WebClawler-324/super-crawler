@@ -14,11 +14,13 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS
     Widgets
     Network
     WebEngineWidgets  # 爬虫核心依赖：WebEngine
+    Sql
 )
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Widgets
     Network
     WebEngineWidgets
+    Sql
 )
 
 # 2. 配置Gumbo源码（路径校验+防遗漏）
@@ -67,7 +69,11 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         Test.html
         Crawl.h
         Crawl.cpp
-        HouseData.h  # Gumbo源码必须加入编译
+        HouseData.h
+        LLMClient.h
+        LLMClient.cpp
+        MYSQL.h
+        MYSQL.cpp  # Gumbo源码必须加入编译
     )
 else()
     if(ANDROID)
@@ -88,6 +94,7 @@ target_link_libraries(WebCrawler PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
     Qt${QT_VERSION_MAJOR}::WebEngineWidgets  # 关键：链接WebEngine
+    Qt${QT_VERSION_MAJOR}::Sql
 )
 
 # 7. 目标属性配置（精简+兼容）
