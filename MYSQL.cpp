@@ -14,8 +14,8 @@ Mysql::~Mysql(){
 void Mysql::connectDatabase(){
     db.setHostName("localhost");
     db.setDatabaseName("HouseDB");
-    db.setUserName("root");
-    db.setPassword("qwqwasas25205817");
+    db.setUserName("crawler_user_1");
+    db.setPassword("123");
     db.setPort(3306);
 qDebug() << "Qt可用数据库驱动：" << QSqlDatabase::drivers();
     // 3. 打开连接并检查结果

@@ -9,6 +9,12 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 测试用
+
+# FEATURE_sql_mysql=ON
+# MySQL_INCLUDE_DIR=C:/Program Files/MySQL/MySQL Server 8.4/include
+# MySQL_LIBRARY=C:/Program Files/MySQL/MySQL Server 8.4/lib/libmysql.lib
+
 # 1. 统一查找Qt模块（兼容Qt5/Qt6，包含WebEngineWidgets）
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS
     Widgets
@@ -64,8 +70,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         ${GUMBO_SOURCES}
-        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/ke_cookies.txt
-        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/h5st_encrypt.js
         Test.html
         Crawl.h
         Crawl.cpp

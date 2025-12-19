@@ -17,24 +17,19 @@
 #include <QFile>
 #include <QTextStream>
 #include<QChar>
-// 在 Crawl.cpp 最顶部添加以下头文件
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QMetaObject> // 同时添加这个，解决 invokeMethod 的头文件依赖
 
-// ===================== 类内静态常量初始化（不变）=====================
+
+// 类内静态常量初始化
 const int Crawl::REQUEST_INTERVAL = 3000;
 const int Crawl::MAX_DEPTH = 1;
 const int Crawl::MIN_REQUEST_INTERVAL = 8000;
 const int Crawl::MAX_REQUEST_INTERVAL = 15000;
 const QStringList Crawl::USER_AGENT_POOL = {
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 };
-// ===================== 全局变量（不变）=====================
+// 全局变量（不变）
 QList<HouseData> houseDataList;
 QSet<QString> houseIdSet;
 QString currentCity;
@@ -106,7 +101,6 @@ void Crawl::simulateHumanBehavior() { // 去掉 ui 参数
 
     int delay = 0;
     for (QString js : jsScrolls) {
-        // 关键修正：接收者改为 this（Lambda 访问 this->webPage，上下文匹配）
         QTimer::singleShot(delay, this, [this, js]() {
             if (this == nullptr || webPage == nullptr) return;
             webPage->runJavaScript(js);
@@ -119,7 +113,7 @@ void Crawl::simulateHumanBehavior() { // 去掉 ui 参数
     emit appendLogSignal("🤖 模拟真人浏览：总停留" + QString::number(totalStayTime/1000) + "秒");
 }
 
-// ===================== Cookie管理函数（修正：用 m_ui + 信号）=====================
+// Cookie管理函数
 void Crawl::loadCookiesFromFile(const QString& filePath) {
     QFile file(filePath.isEmpty() ? "ke_cookies.txt" : filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -137,7 +131,7 @@ void Crawl::loadCookiesFromFile(const QString& filePath) {
     emit appendLogSignal(QString("✅ 成功加载Cookie：%1").arg(cookieStr.isEmpty() ? "无" : "已加载（来自文件）"));
 }
 
-void Crawl::saveCookiesToFile(const QString& filePath) { // 去掉 ui 参数
+void Crawl::saveCookiesToFile(const QString& filePath) {
     QString savePath = filePath.isEmpty() ? "ke_cookies.txt" : filePath;
     QFile file(savePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -151,7 +145,7 @@ void Crawl::saveCookiesToFile(const QString& filePath) { // 去掉 ui 参数
     emit appendLogSignal(QString("✅ Cookie已保存到：%1").arg(savePath));
 }
 
-// ===================== 工具函数（不变）=====================
+// 工具函数
 QString Crawl::generateRandomPvid() {
     const QString chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     QString pvid;
@@ -177,7 +171,7 @@ int Crawl::getRandomInterval() {
     return QRandomGenerator::global()->bounded(MIN_REQUEST_INTERVAL, MAX_REQUEST_INTERVAL);
 }
 
-// ===================== 构造函数（核心修正：初始化成员变量 + 信号槽）=====================
+
 Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindow* ui)
     : QObject(nullptr)
     , webPage(nullptr)
@@ -192,7 +186,7 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     //连接数据库
     mysql->connectDatabase();
 
-    // webPage 初始化（兜底，避免空指针）
+    // webPage 初始化
     if (webPageParam != nullptr) {
         webPage = webPageParam;
         webPage->setParent(this); // 让 Crawl 管理 webPage 生命周期
@@ -200,7 +194,7 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
         webPage = new QWebEnginePage(this);
     }
 
-    // WebEngine 配置（不变）
+    // WebEngine配置
     QWebEngineSettings* settings =webPage->settings();
     settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
     settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
@@ -209,13 +203,12 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     settings->setAttribute(QWebEngineSettings::PluginsEnabled, false);
     settings->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard, false);
 
-    // 连接页面加载完成信号（修正：槽函数不带 ui 参数）
+    // 连接页面加载完成信号
     connect(webPage, &QWebEnginePage::loadFinished, this, &Crawl::onPageLoadFinished);
 
-    // 加载 Cookie（用成员变量 m_ui，无需传参）
+    // 加载 Cookie
     loadCookiesFromFile();
 
-    // 关键修正：接收者改为 this（SLOT 对应当前类槽函数，上下文匹配）
     int delayMs = 1000 + QRandomGenerator::global()->bounded(2000);
     QTimer::singleShot(
         delayMs,
@@ -225,7 +218,7 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
 }
 
 Crawl::~Crawl() {
-    // 清理 Web 页面资源（避免内存泄漏）
+    // 清理 Web
     if (webPage != nullptr) {
         webPage->deleteLater(); // 延迟销毁，避免阻塞事件循环
         webPage = nullptr;
@@ -244,15 +237,14 @@ Crawl::~Crawl() {
     emit appendLogSignal("🔌 Crawl 实例已安全销毁，资源释放完成");
 }
 
-// ===================== 初始化完成日志槽函数（修正：用 m_ui + 信号）=====================
+
 void Crawl::onInitFinishedLog() {
-    // 发送信号，由 MainWindow 主线程更新 UI（安全）
     emit appendLogSignal("✅ 浏览器环境初始化完成，可开始爬取贝壳找房（低风控模式）");
     emit appendLogSignal("💡 使用说明：在输入框输入城市名（如：北京、上海），点击搜索对比按钮");
 }
 
-// ===================== 处理普通URL（修正：用 m_ui + 信号）=====================
-void Crawl::processNextUrl() { // 去掉 ui 参数
+//处理普通URL
+void Crawl::processNextUrl() {
     if (urlQueue.isEmpty()) {
         emit appendLogSignal("\n=== 贝壳找房首页爬取完成 ===");
         return;
@@ -267,20 +259,20 @@ void Crawl::processNextUrl() { // 去掉 ui 参数
     QString randomUA = getRandomUA();
     request.setHeader(QByteArray("User-Agent"), randomUA.toUtf8());
     request.setHeader(QByteArray("Referer"), QByteArray("https://www.ke.com/"));
-    request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
-    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br, zstd"));
-    request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"));
+    request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
+    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
+    request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8"));
     request.setHeader(QByteArray("Cache-Control"), QByteArray("no-cache"));
     request.setHeader(QByteArray("Connection"), QByteArray("keep-alive"));
-    request.setHeader(QByteArray("DNT"), QByteArray("1"));
+    // 移除 DNT:1（冗余，普通用户不携带）
     request.setHeader(QByteArray("Pragma"), QByteArray("no-cache"));
-    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"128\", \"Not=A?Brand\";v=\"99\", \"Microsoft Edge\";v=\"128\""));
+    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\"")); // 更新版本
     request.setHeader(QByteArray("Sec-Ch-Ua-Mobile"), QByteArray("?0"));
     request.setHeader(QByteArray("Sec-Ch-Ua-Platform"), QByteArray("\"Windows\""));
     request.setHeader(QByteArray("Sec-Fetch-Dest"), QByteArray("document"));
     request.setHeader(QByteArray("Sec-Fetch-Mode"), QByteArray("navigate"));
     request.setHeader(QByteArray("Sec-Fetch-Site"), QByteArray("same-origin"));
-    request.setHeader(QByteArray("Sec-Fetch-User"), QByteArray("?1"));
+    // 移除 Sec-Fetch-User:?1（冗余，脚本特征）
     request.setHeader(QByteArray("Upgrade-Insecure-Requests"), QByteArray("1"));
 
     if (!cookieStr.isEmpty()) {
@@ -292,8 +284,8 @@ void Crawl::processNextUrl() { // 去掉 ui 参数
     webPage->load(request);
 }
 
-// ===================== 页面加载完成槽函数（核心修正：跨线程 + 成员变量）=====================
-void Crawl::onPageLoadFinished(bool ok) { // 去掉 ui 参数
+//页面加载完成槽函数
+void Crawl::onPageLoadFinished(bool ok) {
     if (this == nullptr || webPage == nullptr) return;
 
     QString currentUrl = webPage->url().toString();
@@ -346,11 +338,11 @@ void Crawl::onPageLoadFinished(bool ok) { // 去掉 ui 参数
         return;
     }
 
-    // 加载成功 + 模拟真人行为
+    // 加载成功 模拟真人行为
     emit appendLogSignal("✅ 页面加载成功：" + currentUrl);
     simulateHumanBehavior(); // 无需传参，用成员变量
 
-    // 渲染延迟（不变）
+    // 渲染延迟
     int renderDelay = currentUrl.contains("ershoufang")
                           ? 15000 + QRandomGenerator::global()->bounded(5000)
                           : 4000 + QRandomGenerator::global()->bounded(3000);
@@ -358,7 +350,7 @@ void Crawl::onPageLoadFinished(bool ok) { // 去掉 ui 参数
         emit appendLogSignal("⏳ 房源页等待完全渲染（" + QString::number(renderDelay/1000) + "秒）...");
     }
 
-    // 渲染延迟后提取数据（核心修正：跨线程用信号 + 成员变量）
+    // 渲染延迟后提取数据
     QTimer::singleShot(renderDelay, this, [this, currentUrl, isSearchTask]() {
         if (this == nullptr || webPage == nullptr) return;
 
@@ -374,15 +366,11 @@ void Crawl::onPageLoadFinished(bool ok) { // 去掉 ui 参数
 
                 // 处理下一页或结束
                 QString nextLog;
-                if (currentPageCount < targetPageCount && !searchUrlQueue.isEmpty()) {
-                    int nextInterval = 20000 + QRandomGenerator::global()->bounded(10000);
-                    nextLog = QString("🔄 准备加载下一页（延迟%1秒）...").arg(nextInterval/1000);
-                    QTimer::singleShot(nextInterval, this, &Crawl::processSearchUrl);
-                } else {
-                    isProcessingSearchTask = false;
-                    nextLog = "✅ 所有搜索任务完成，准备显示对比结果...";
-                    QTimer::singleShot(1000, this, &Crawl::showHouseCompareResult);
-                }
+                //爬完当前页就结束，不加载下一页
+                isProcessingSearchTask = false;
+                nextLog = QString("✅ 第%1页爬取完成，无下一页（一次只爬1页），准备显示结果...").arg(targetPageCount);
+                QTimer::singleShot(1000, this, &Crawl::showHouseCompareResult);
+
                 emit appendLogSignal(nextLog);
             } else if (!isSearchTask) {
                 extractKeData(html, currentUrl);
@@ -392,7 +380,7 @@ void Crawl::onPageLoadFinished(bool ok) { // 去掉 ui 参数
     });
 }
 
-// ===================== 解析贝壳普通页面（不变）=====================
+//解析普通页面
 void Crawl::extractKeData(const QString& html, const QString& baseUrl)
 {
    emit appendLogSignal("🔍 开始解析贝壳页面...");
@@ -450,7 +438,7 @@ void Crawl::extractHouseData(const QString& html)
         QString houseUrl = "未知";
 
 
-        // 👉 1. 提取房源标题
+        //  提取房源标题
         QRegularExpression titleRegex(R"(<a\s+.*?title=["']([^"']+)["'].*?>)", QRegularExpression::DotMatchesEverythingOption);
         if (titleRegex.match(houseHtml).hasMatch()) {
             title = titleRegex.match(houseHtml).captured(1).trimmed();
@@ -458,10 +446,8 @@ void Crawl::extractHouseData(const QString& html)
        emit appendLogSignal(QString("\n📌 房源标题：%1").arg(title));
 
 
-       // 👉 2. 小区名提取（放弃多余判断，直接抓 a 标签文本）
-       // 第一步：匹配 positionInfo 容器 + 预处理（移除干扰标签）
-       // 👉 前提：确保 houseHtml 是 QString::fromUtf8() 解码的 UTF-8 字符串！
-       // 1. 匹配 positionInfo 容器 + 预处理（移除span干扰）
+       //  2. 小区名提取（放弃多余判断，直接抓 a 标签文本）
+       // 匹配 positionInfo 容器 + 预处理（移除span干扰）
        QRegularExpression posInfoRegex(R"(<div\s+class=["']positionInfo["']([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
        QRegularExpressionMatch posInfoMatch = posInfoRegex.match(houseHtml);
        if (!posInfoMatch.hasMatch()) {
@@ -471,23 +457,23 @@ void Crawl::extractHouseData(const QString& html)
        QString posInfoHtml = posInfoMatch.captured(0).trimmed();
        posInfoHtml.remove(QRegularExpression(R"(<span[^>]*>.*?</span>)")); // 移除span标签
 
-       // 2. 核心正则：匹配<a...>后到</a>前的所有内容（精准截断，保留特殊字符）
+       //匹配<a...>后到</a>前的所有内容
        QRegularExpression aTagRegex(
-           R"(<a\s+[^>]*>([\s\S]*?)</a>)", // 非贪婪匹配：<a>后 → </a>前的所有内容
+           R"(<a\s+[^>]*>([\s\S]*?)</a>)",
            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
            );
        QRegularExpressionMatch aTagMatch = aTagRegex.match(posInfoHtml);
 
        if (aTagMatch.hasMatch()) {
            QString rawName = aTagMatch.captured(1).trimmed();
-           // 过滤规则修改：保留「•」「-」「()」等合法字符，只移除引号/空格
+
            communityName = rawName
                                .remove(QRegularExpression(R"(\s+)"))       // 移除多余空格
                                .replace("“", "").replace("”", "")          // 移除中文引号
                                .replace("\"", "").replace("'", "");         // 移除英文引号
-           // 👉 关键：不再过滤「•」，保留小区名中的合法特殊字符
+           // 保留小区名中的合法特殊字符
        } else {
-           // 兜底逻辑：精准找</a>位置并截断
+
            int aTagStart = posInfoHtml.indexOf("<a");
            if (aTagStart == -1) {
                emit appendLogSignal("❌ positionInfo 内无 a 标签");
@@ -499,9 +485,9 @@ void Crawl::extractHouseData(const QString& html)
                emit appendLogSignal("❌ a 标签格式异常");
                continue;
            }
-           // 截取<a>后 → </a>前的内容
+
            QString temp = posInfoHtml.mid(aTagClose + 1, aTagEnd - aTagClose - 1).trimmed();
-           // 同样保留「•」，只清理冗余
+
            temp = temp.remove(QRegularExpression(R"(\s+)")).replace("“", "").replace("”", "").replace("\"", "");
            if (!temp.isEmpty()) {
                communityName = temp;
@@ -510,49 +496,45 @@ void Crawl::extractHouseData(const QString& html)
            }
        }
 
-       // 最终输出（此时communityName应为「观澜湖•九里」，无乱码）
        if (!communityName.isEmpty()) {
            emit appendLogSignal(QString("✅ 小区名提取成功：%1").arg(communityName));
        } else {
            emit appendLogSignal("❌ 小区名提取失败");
        }
-       // 👉 3. 提取总价（支持整数/小数）
+
        QRegularExpression totalPriceRegex(
            R"(<div\s+class=["']totalPrice totalPrice2["']>.*?<span\s+class=["']*["']>(\s*[\d.]+)\s*</span>.*?<i>万</i>.*?</div>)",
            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
            );
        QRegularExpressionMatch priceMatch = totalPriceRegex.match(houseHtml); // 只匹配一次，提升效率
        if (priceMatch.hasMatch()) {
-           QString priceNum = priceMatch.captured(1).trimmed(); // 捕获267.9
-           totalPrice = priceNum + " 万"; // 拼接为"267.9 万"
-           // 可选：转成数值类型（如double）
-           // double priceVal = priceNum.toDouble();
+           QString priceNum = priceMatch.captured(1).trimmed();
+           totalPrice = priceNum + " 万";
+
        } else {
            emit appendLogSignal("❌ 总价提取失败");
        }
 
 
-       // 👉 4. 提取单价（修复span标签匹配问题，兼容无空格/无属性的span）
+       // 提取单价
        QRegularExpression unitPriceRegex(
-           R"(<span\s*[^>]*>\s*([\d,.]+)\s*(元/平|元/㎡)</span>)",  // 关键：\s+ → \s*
+           R"(<span\s*[^>]*>\s*([\d,.]+)\s*(元/平|元/㎡)</span>)",
            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
            );
        QRegularExpressionMatch unitPriceMatch = unitPriceRegex.match(houseHtml);
        if (unitPriceMatch.hasMatch()) {
-           QString priceNum = unitPriceMatch.captured(1).trimmed(); // 捕获16,056
-           unitPrice = priceNum + " 元/㎡"; // 最终：16,056 元/㎡
-           // 可选：清理逗号转数值（存入数据库用）
-           // double unitPriceVal = priceNum.remove(",").toDouble();
+           QString priceNum = unitPriceMatch.captured(1).trimmed();
+           unitPrice = priceNum + " 元/㎡";
+
        } else {
            emit appendLogSignal("❌ 单价提取失败");
        }
 
 
-        // 👉 5. 提取楼层/建筑年代/户型/面积/朝向（按关键词识别，无视顺序）
+        // 提取楼层/建筑年代/户型/面积/朝向
         QRegularExpression houseInfoRegex(R"(<div\s+class=["']houseInfo["'].*?>([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
         QString houseInfoHtml = houseInfoRegex.match(houseHtml).captured(1).trimmed();
 
-        // 初始化字段为“未知”（默认值）
         floor = "未知";
         buildingYear = "未知";
         houseType = "未知";
@@ -560,7 +542,7 @@ void Crawl::extractHouseData(const QString& html)
         orientation = "未知";
 
         if (!houseInfoHtml.isEmpty()) {
-            // 步骤1：清理文本（仅移除HTML标签和换行，保留所有字符，不做多余处理）
+            //清理文本
             QString cleanHouseInfo = houseInfoHtml;
             cleanHouseInfo.replace(QRegularExpression(R"(<[^>]+>)"), ""); // 删所有HTML标签
             cleanHouseInfo.replace(QRegularExpression(R"(\n|\r)"), " "); // 换行符转为空格
@@ -568,8 +550,7 @@ void Crawl::extractHouseData(const QString& html)
 
             emit appendLogSignal(QString("📋 清理后的houseInfo：%1").arg(cleanHouseInfo));
 
-            // 步骤2：直接扫描完整文本，用正则逐个匹配字段（不拆分，稳定优先）
-            // 2.1 匹配“楼层”（支持：底层、顶层、低/中/高楼层 + 共X层）
+
             QRegularExpression floorRegex(
                 R"((底层|顶层|低楼层|中楼层|高楼层)\s*\(\s*共\d+层\s*\))", // 完整格式：底层 (共7层)
                 QRegularExpression::CaseInsensitiveOption
@@ -581,7 +562,7 @@ void Crawl::extractHouseData(const QString& html)
                 floor = floor.replace(QRegularExpression(R"(\s+)"), "");
                 emit appendLogSignal(QString("✅楼层：%1").arg(floor));
             } else {
-                // 兜底：匹配无“共X层”的情况（如“底层”“高楼层”）
+
                 QRegularExpression floorSimpleRegex(R"(底层|顶层|低楼层|中楼层|高楼层)");
                 if (floorSimpleRegex.match(cleanHouseInfo).hasMatch()) {
                     floor = floorSimpleRegex.match(cleanHouseInfo).captured(0);
@@ -589,14 +570,14 @@ void Crawl::extractHouseData(const QString& html)
                 }
             }
 
-            // 2.2 匹配“户型”（格式：X室X厅，优先完整匹配）
+            // 匹配户型
             QRegularExpression houseTypeRegex(R"(\d+室\d+厅)", QRegularExpression::CaseInsensitiveOption);
             if (houseTypeRegex.match(cleanHouseInfo).hasMatch()) {
                 houseType = houseTypeRegex.match(cleanHouseInfo).captured(0);
                 emit appendLogSignal(QString("✅户型：%1").arg(houseType));
             }
 
-            // 2.3 匹配“面积”（格式：数字+平米，支持整数/小数）
+            // 匹配面积
             QRegularExpression areaRegex(R"((\d+(\.\d+)?)平米)", QRegularExpression::CaseInsensitiveOption);
             if (areaRegex.match(cleanHouseInfo).hasMatch()) {
                 QString areaNum = areaRegex.match(cleanHouseInfo).captured(1);
@@ -604,14 +585,14 @@ void Crawl::extractHouseData(const QString& html)
                 emit appendLogSignal(QString("✅面积：%1").arg(area));
             }
 
-            // 2.4 匹配“建筑年代”（格式：4位数字+年）
+            //匹配建筑年代
             QRegularExpression yearRegex(R"(\d{4}年)", QRegularExpression::CaseInsensitiveOption);
             if (yearRegex.match(cleanHouseInfo).hasMatch()) {
                 buildingYear = yearRegex.match(cleanHouseInfo).captured(0);
                 emit appendLogSignal(QString("✅建筑年代：%1").arg(buildingYear));
             }
 
-            // 2.5 匹配“朝向”（方向词组合：南/北/东/西等，去重合并）
+            //匹配“朝向”
             QStringList dirWords = {"东南", "西南", "东北", "西北", "南", "北", "东", "西"}; // 长方向词优先（避免“东南”被拆为“东”+“南”）
             QString dirResult = "";
             foreach (QString dir, dirWords) {
@@ -629,7 +610,7 @@ void Crawl::extractHouseData(const QString& html)
             emit appendLogSignal("⚠️  未提取到 houseInfo 相关信息");
         }
 
-        // 👉 6. 提取房源链接
+        //提取房源链接
         QRegularExpression urlRegex(R"(<a\s+.*?href=["']([^"']+)["'].*?>)", QRegularExpression::DotMatchesEverythingOption);
         if (urlRegex.match(houseHtml).hasMatch()) {
             houseUrl = urlRegex.match(houseHtml).captured(1).trimmed();
@@ -637,7 +618,7 @@ void Crawl::extractHouseData(const QString& html)
         }
 
 
-        // ========== 存储数据 ==========
+        //存储数据
         if (!title.isEmpty() && !houseUrl.isEmpty() && !houseIdSet.contains(houseUrl)) {
             houseIdSet.insert(houseUrl);
             HouseData data;
@@ -667,7 +648,7 @@ void Crawl::extractHouseData(const QString& html)
 }
 
 
-// ===================== 处理房源页URL（不变）=====================
+// 处理房源页URL
 void Crawl::processSearchUrl()
 {
     if (searchUrlQueue.isEmpty()) {
@@ -685,20 +666,18 @@ void Crawl::processSearchUrl()
     QString randomUA = getRandomUA();
     request.setHeader(QByteArray("User-Agent"), randomUA.toUtf8());
     request.setHeader(QByteArray("Referer"), QByteArray("https://www.ke.com/"));
-    request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
-    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br, zstd"));
-    request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"));
+    request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
+    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
+    request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8"));
     request.setHeader(QByteArray("Cache-Control"), QByteArray("no-cache"));
     request.setHeader(QByteArray("Connection"), QByteArray("keep-alive"));
-    request.setHeader(QByteArray("DNT"), QByteArray("1"));
     request.setHeader(QByteArray("Pragma"), QByteArray("no-cache"));
-    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"128\", \"Not=A?Brand\";v=\"99\", \"Microsoft Edge\";v=\"128\""));
+    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\"")); // 更新版本
     request.setHeader(QByteArray("Sec-Ch-Ua-Mobile"), QByteArray("?0"));
     request.setHeader(QByteArray("Sec-Ch-Ua-Platform"), QByteArray("\"Windows\""));
     request.setHeader(QByteArray("Sec-Fetch-Dest"), QByteArray("document"));
     request.setHeader(QByteArray("Sec-Fetch-Mode"), QByteArray("navigate"));
     request.setHeader(QByteArray("Sec-Fetch-Site"), QByteArray("same-origin"));
-    request.setHeader(QByteArray("Sec-Fetch-User"), QByteArray("?1"));
     request.setHeader(QByteArray("Upgrade-Insecure-Requests"), QByteArray("1"));
 
     if (!cookieStr.isEmpty()) {
@@ -711,7 +690,7 @@ void Crawl::processSearchUrl()
     webPage->load(request);
 }
 
-// ===================== 展示房源对比结果（不变）=====================
+// 展示房源对比结果
 void Crawl::showHouseCompareResult()
 {
     emit appendLogSignal("\n" + QString("=").repeated(60));
@@ -734,7 +713,7 @@ void Crawl::showHouseCompareResult()
         emit appendLogSignal("💰 总价：" + data.price + " | 单价：" + data.unitPrice);
         emit appendLogSignal("📐 户型/面积：" + data.houseType + " / " + data.area);
 
-        // 核心修改：合并楼层和朝向，去除多余空格，格式整洁
+
         QString floorAndOri = "";
         if (data.floor != "未知" && data.orientation != "未知") {
             floorAndOri = data.floor + " " + data.orientation;
@@ -792,77 +771,76 @@ void Crawl::showHouseCompareResult()
     emit appendLogSignal("\n=== 房源对比完成（低风控模式）===");
 }
 
-
-// Crawl.cpp
 void Crawl::startHouseCrawl(const QString& city, int targetPages)
 {
     currentCity = city.trimmed(); // 用 Crawl 类内成员 currentCity 替代全局变量
     if (currentCity.isEmpty()) {
-        // 原 QMessageBox 保留，但通过信号通知 MainWindow 显示（Crawl 不直接操作UI）
         emit appendLogSignal("❌ 错误：请输入城市名！（如：北京、上海、广州）");
         return;
     }
 
-    // 页数限制（和原槽函数一致，最多2页）
-    targetPageCount = targetPages; // 用类内成员 targetPageCount 替代全局变量
-    if (targetPageCount > 2) {
-        targetPageCount = 2;
-        // 原 UI 赋值（ui->pageSpin->setValue）移到 MainWindow 调用前处理，这里仅日志提示
-        emit appendLogSignal("⚠️  风控限制：单次最多爬2页，已自动调整为2页");
+    // 页数限制最多2页
+    targetPageCount = targetPages;
+    if (targetPageCount < 1) {
+        targetPageCount = 1;
+        emit appendLogSignal("⚠️  页码不能小于1，已自动调整为第1页");
+    }
+    if (targetPageCount > 5) {
+        targetPageCount = 5;
+        emit appendLogSignal("⚠️  风控限制：目标页码最大为5，已自动调整为第5页");
     }
 
-    // 2. 清空旧数据（和原槽函数一致，用类内成员替代全局变量）
-    searchUrlQueue.clear();    // Crawl 类内成员：搜索URL队列
-    houseDataList.clear();     // Crawl 类内成员：房源数据列表
-    houseIdSet.clear();        // Crawl 类内成员：房源ID去重集合
-    currentPageCount = 0;      // Crawl 类内成员：当前已爬页数
-    isProcessingSearchTask = true; // Crawl 类内成员：搜索任务标志位
 
-    // 3. 输出风控提醒日志（和原槽函数完全一致，用信号替代直接操作 ui->textEdit）
-    emit appendLogSignal("=== 低风控模式：爬取「" + currentCity + "」二手房房源（共" + QString::number(targetPageCount) + "页）===");
-    emit appendLogSignal("⚠️ 风控提醒：贝壳反爬严格，单次最多爬2页，间隔≥20秒！");
-    emit appendLogSignal("⚠️ 请确保ke_cookies.txt中的Cookie是登录后最新抓取的！");
+    //清空旧数据
+    searchUrlQueue.clear();    // 搜索URL队列
+    houseDataList.clear();     // 房源数据列表
+    houseIdSet.clear();        // 房源ID去重集合
+    currentPageCount = 0;      // 当前已爬页数
+    isProcessingSearchTask = true; // 搜索任务标志位
+
+    emit appendLogSignal("=== 低风控模式：爬取「" + currentCity + "」二手房房源（第" + QString::number(targetPageCount) + "页）===");
+    emit appendLogSignal("⚠️  风控提醒：单次只爬1页，目标页码范围1-5！");
+    emit appendLogSignal("⚠️  请确保ke_cookies.txt中的Cookie是登录后最新抓取的！");
     emit appendLogSignal("————————————————");
 
-    // 4. 城市名转拼音（和原槽函数一致，调用 Crawl 自身的工具函数）
-    QString cityPinyin = cityToPinyin(currentCity); // Crawl 类内成员函数
+    // 城市名转拼音（
+    QString cityPinyin = cityToPinyin(currentCity);
     emit appendLogSignal("🏙️  城市拼音转换：" + currentCity + " → " + cityPinyin);
 
-    // 5. 生成待爬取房源页 URL（和原槽函数完全一致，用类内队列替代全局队列）
-    for (int pageNum = 1; pageNum <= targetPageCount; pageNum++) {
-        QString pvid = generateRandomPvid(); // Crawl 类内工具函数
-        QString logId = generateLogId();     // Crawl 类内工具函数
-        QString houseUrl = QString("https://%1.ke.com/ershoufang/pg%2/?pvid=%3&log_id=%4")
-                               .arg(cityPinyin)
-                               .arg(pageNum)
-                               .arg(pvid)
-                               .arg(logId);
-        searchUrlQueue.enqueue(houseUrl); // 加入 Crawl 类内的 searchUrlQueue
-        emit appendLogSignal("📌 待爬取房源页：" + houseUrl);
-    }
+    //生成待爬取房源页 URL
+    QString pvid = generateRandomPvid();
+    QString logId = generateLogId();
+    // 页码直接用 targetPageCount（目标页码）
+    QString houseUrl = QString("https://%1.ke.com/ershoufang/pg%2/?pvid=%3&log_id=%4")
+                           .arg(cityPinyin)
+                           .arg(targetPageCount) // 这里用目标页码，不是循环变量
+                           .arg(pvid)
+                           .arg(logId);
+    searchUrlQueue.enqueue(houseUrl);
+    emit appendLogSignal("📌 待爬取房源页：" + houseUrl);
 
-    // 6. 访问贝壳首页建立会话（和原槽函数完全一致，用 Crawl 类内成员）
+
     emit appendLogSignal("🏠 第一步：先访问贝壳首页建立会话...");
     QString homeUrl = "https://www.ke.com/";
     QWebEngineHttpRequest homeRequest(homeUrl);
-    QString homeUA = getRandomUA(); // Crawl 类内工具函数
+    QString homeUA = getRandomUA();
 
-    // 设置请求头（和原槽函数完全一致）
+    // 设置请求头
     homeRequest.setHeader(QByteArray("User-Agent"), homeUA.toUtf8());
     homeRequest.setHeader(QByteArray("Referer"), QByteArray(""));
     homeRequest.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
-    homeRequest.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br, zstd"));
+    homeRequest.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
     homeRequest.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"));
 
-    // 携带 Cookie（和原槽函数一致，用 Crawl 类内的 cookieStr）
-    if (!cookieStr.isEmpty()) { // Crawl 类内成员：Cookie字符串
+    // 携带 Cooki
+    if (!cookieStr.isEmpty()) {
         homeRequest.setHeader(QByteArray("Cookie"), cookieStr.toUtf8());
     }
 
-    // 启动首页加载（和原槽函数一致，用 Crawl 类内的 webPage）
-    webPage->load(homeRequest); // Crawl 类内成员：QWebEnginePage 实例
-    isHomeLoadedForSearch = true; // Crawl 类内成员：首页加载标志
-    pendingSearchKeyword = currentCity; // Crawl 类内成员：待搜索关键词
+    // 启动首页加载（
+    webPage->load(homeRequest); // QWebEnginePage 实例
+    isHomeLoadedForSearch = true; //首页加载标志
+    pendingSearchKeyword = currentCity; //待搜索关键词
 }
 
 /*void Crawl::IntoDB()
