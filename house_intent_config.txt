@@ -1,0 +1,19 @@
+# -------- House Intent Model Config --------
+# 支持：key=value
+# 支持注释：# 或 //（行内也可以）
+# 未知 key 会忽略并记录 warning
+# 非法 value 会回退到默认值并记录 warning
+
+# --- Preprocessor params ---
+max_prices = 500
+max_room = 5
+max_floor = 60
+max_meter_price = 20000
+min_year = 1900
+max_year = 2025
+
+# --- Train params ---
+epochs = 150
+lr = 0.05
+l2 = 0.0001
+shuffle = 1

@@ -1,2 +1,35 @@
-/build/
-CMakeLists.txt.user
+# ===== Build outputs =====
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# ===== Qt Creator user files =====
+*.pro.user
+*.pro.user.*
+*.user
+*.user.*
+
+# ===== OS junk =====
+.DS_Store
+Thumbs.db
+
+# ===== Compiled binaries =====
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+*.a
+*.lib
+*.pdb
+
+# ===== Model weights / local data =====
+house_intent_weights.bin
+*.bin
+
+# ===== Optional: local config (if you want keep private) =====
+# house_intent_config.txt

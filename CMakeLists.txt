@@ -109,6 +109,9 @@ target_link_libraries(WebCrawler PRIVATE
     Qt${QT_VERSION_MAJOR}::WebEngineWidgets  # 关键：链接WebEngine
     Qt${QT_VERSION_MAJOR}::Sql
 )
+target_include_directories(own PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen
+)
 
 # 7. 目标属性配置（精简+兼容）
 if(${QT_VERSION} VERSION_LESS 6.1.0)
