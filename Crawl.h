@@ -88,6 +88,7 @@ public:
 signals:
     // 日志信号（用于主线程更新 UI）
     void appendLogSignal(const QString& log);
+    void startCrawlSignal(const QString& city, int targetPages);
 
 private slots:
     void onInitFinishedLog();

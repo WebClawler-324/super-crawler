@@ -193,6 +193,7 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     } else {
         webPage = new QWebEnginePage(this);
     }
+       connect(this, &Crawl::startCrawlSignal, this, &Crawl::startHouseCrawl, Qt::QueuedConnection);
 
     // WebEngine配置
     QWebEngineSettings* settings =webPage->settings();
@@ -750,7 +751,7 @@ void Crawl::showHouseCompareResult()
                 validPriceCount++;
             }
             //插入数据到数据库
-            mysql->insertInfo(house);
+           // mysql->insertInfo(house);
         }
 
         if (validPriceCount > 0) {
