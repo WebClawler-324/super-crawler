@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据统计 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台</h1>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="nav-link">首页</a>
+                <a href="/favorites.html" class="nav-link" id="favoritesLink" style="display: none;">我的收藏</a>
+                <a href="/statistics.html" class="nav-link active">数据统计</a>
+                <a href="/ai-assistant.html" class="nav-link">AI助手</a>
+                <a href="/admin.html" class="nav-link" id="adminLink" style="display: none;">管理后台</a>
+            </div>
+            <div class="nav-user">
+                <button class="btn btn-primary" id="loginBtn">登录</button>
+                <button class="btn btn-secondary" id="registerBtn">注册</button>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <span id="username"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/settings.html'">设置</button>
+                    <button class="btn btn-secondary btn-sm" id="logoutBtn" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="statistics-section">
+            <h2>📊 数据统计</h2>
+            
+            <div id="loadingIndicator" class="loading">加载中...</div>
+            
+            <div id="statisticsContent" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🏘️</div>
+                        <div class="stat-value" id="totalHouses">0</div>
+                        <div class="stat-label">房源总数</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value" id="avgPrice">0</div>
+                        <div class="stat-label">平均价格（万元）</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">📐</div>
+                        <div class="stat-value" id="avgArea">0</div>
+                        <div class="stat-label">平均面积（㎡）</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">📍</div>
+                        <div class="stat-value" id="totalCommunities">0</div>
+                        <div class="stat-label">小区数量</div>
+                    </div>
+                </div>
+                
+                <div class="chart-section">
+                    <h3>价格分布</h3>
+                    <div id="priceDistribution" class="chart-container"></div>
+                </div>
+                
+                <div class="chart-section">
+                    <h3>🔥 最受欢迎房源 TOP 10</h3>
+                    <div id="popularHouses" class="chart-container"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .statistics-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .statistics-section h2 {
+            color: #667eea;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .chart-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .chart-section h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            min-height: 300px;
+        }
+        
+        .chart-item {
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+        
+        .chart-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .chart-item:last-child {
+            border-bottom: none;
+        }
+        
+        .chart-item-label {
+            flex: 0 0 auto;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        
+        .chart-item-bar {
+            height: 30px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 5px;
+            position: relative;
+            min-width: 50px;
+        }
+        
+        .chart-item-value {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .chart-item-meta {
+            margin-top: 4px;
+            font-size: 0.85em;
+            color: #888;
+        }
+        
+        .price-range {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border: 2px solid #f0f0f0;
+        }
+        
+        .price-range-label {
+            font-weight: 600;
+            color: #333;
+            min-width: 150px;
+        }
+        
+        .price-range-bar {
+            flex: 1;
+            margin: 0 1rem;
+        }
+        
+        .price-range-value {
+            font-weight: 600;
+            color: #667eea;
+            min-width: 80px;
+            text-align: right;
+        }
+    </style>
+
+    <script src="/js/common.js"></script>
+    <script>
+        // 加载统计数据
+        async function loadStatistics() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            try {
+                // 同时请求房源列表和小区统计
+                const [housesData, statsData] = await Promise.all([
+                    apiRequest('/api/houses?limit=10000'), // 获取所有房源用于统计
+                    apiRequest('/api/houses/statistics')    // 获取小区统计
+                ]);
+                
+                document.getElementById('loadingIndicator').style.display = 'none';
+                
+                console.log('Houses API response:', housesData);
+                console.log('Stats API response:', statsData);
+                
+                // 只要有一个接口成功就显示数据
+                if (housesData.success || statsData.success) {
+                    const houses = (housesData.success && housesData.data) ? housesData.data : [];
+                    const communityStats = (statsData.success && statsData.data) ? statsData.data : [];
+                    
+                    if (houses.length === 0 && communityStats.length === 0) {
+                        showMessage('暂无数据，请先导入房源信息', 'error');
+                        return;
+                    }
+                    
+                    displayStatistics(houses, communityStats);
+                } else {
+                    const errorMsg = housesData.message || statsData.message || '加载失败';
+                    showMessage(errorMsg, 'error');
+                    console.error('API errors:', housesData, statsData);
+                }
+            } catch (error) {
+                document.getElementById('loadingIndicator').style.display = 'none';
+                showMessage('网络请求失败: ' + error.message, 'error');
+                console.error('Load statistics error:', error);
+            }
+        }
+        
+        // 显示统计数据
+        function displayStatistics(houses, communityStats) {
+            // 计算基础统计
+            const total = houses.length;
+            const avgPrice = total > 0 ? houses.reduce((sum, h) => sum + (h.price || 0), 0) / total : 0;
+            const avgArea = total > 0 ? houses.reduce((sum, h) => sum + (h.area || 0), 0) / total : 0;
+            const totalCommunities = new Set(houses.map(h => h.communityName)).size;
+            
+            // 显示基础统计
+            document.getElementById('totalHouses').textContent = formatNumber(total);
+            document.getElementById('avgPrice').textContent = avgPrice.toFixed(2);
+            document.getElementById('avgArea').textContent = avgArea.toFixed(2);
+            document.getElementById('totalCommunities').textContent = formatNumber(totalCommunities);
+            
+            // 价格分布
+            displayPriceDistribution(houses);
+            
+            // 加载热门房源
+            loadPopularHouses();
+            
+            document.getElementById('statisticsContent').style.display = 'block';
+        }
+        
+        // 加载热门房源
+        async function loadPopularHouses() {
+            const data = await apiRequest('/api/houses/popular');
+            console.log('Popular houses API response:', data);
+            if (data.success && data.data) {
+                console.log('Popular houses count:', data.data.length);
+                displayPopularHouses(data.data);
+            } else {
+                console.error('Failed to load popular houses:', data);
+                const container = document.getElementById('popularHouses');
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">暂无数据</p>';
+            }
+        }
+        
+        // 显示热门房源
+        function displayPopularHouses(houses) {
+            console.log('Displaying popular houses:', houses);
+            const container = document.getElementById('popularHouses');
+            console.log('Container element:', container);
+            container.innerHTML = '';
+            
+            if (!Array.isArray(houses) || houses.length === 0) {
+                console.warn('No houses to display');
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">暂无数据</p>';
+                return;
+            }
+            
+            const maxCount = houses.length > 0 && houses[0].favorite_count > 0 ? houses[0].favorite_count : 1;
+            console.log('Max favorite count:', maxCount);
+            
+            houses.forEach((house, index) => {
+                const favoriteCount = house.favorite_count || 0;
+                const percentage = maxCount > 0 ? (favoriteCount / maxCount) * 100 : 0;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'chart-item';
+                itemDiv.style.cursor = 'pointer';
+                itemDiv.onclick = () => window.location.href = `/house-detail.html?id=${house.ID}`;
+                itemDiv.innerHTML = `
+                    <div class="chart-item-label">
+                        <span style="color: #667eea; font-weight: 700; margin-right: 8px;">#${index + 1}</span>
+                        <span style="font-weight: 600;">${house.houseTitle || '未命名房产'}</span>
+                        <span style="color: #666; font-size: 0.9em; margin-left: 8px;">- ${house.communityName || ''}</span>
+                    </div>
+                    <div class="chart-item-bar" style="width: ${percentage}%; background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);">
+                        <span class="chart-item-value">❤️ ${favoriteCount}人收藏</span>
+                    </div>
+                    <div class="chart-item-meta" style="margin-top: 4px; font-size: 0.85em; color: #888;">
+                        ${house.houseType || '-'} | ${house.area || '-'}㎡ | ¥${formatNumber(house.price || 0)}万
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+        
+        // 显示价格分布
+        function displayPriceDistribution(houses) {
+            const container = document.getElementById('priceDistribution');
+            container.innerHTML = '';
+            if (!Array.isArray(houses) || houses.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">暂无数据</p>';
+                return;
+            }
+            const ranges = [
+                { label: '0-100万', min: 0, max: 100 },
+                { label: '100-200万', min: 100, max: 200 },
+                { label: '200-300万', min: 200, max: 300 },
+                { label: '300-500万', min: 300, max: 500 },
+                { label: '500万以上', min: 500, max: Infinity }
+            ];
+            const counts = ranges.map(range => {
+                return houses.filter(h => {
+                    const price = h.price || 0;
+                    return price >= range.min && price < range.max;
+                }).length;
+            });
+            const maxCount = Math.max(...counts, 1);
+            ranges.forEach((range, index) => {
+                const count = counts[index];
+                const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'price-range';
+                itemDiv.innerHTML = `
+                    <div class="price-range-label">${range.label}</div>
+                    <div class="price-range-bar">
+                        <div style="width: ${percentage}%; height: 30px; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 5px; position: relative;"></div>
+                    </div>
+                    <div class="price-range-value">${count}套</div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStatistics();
+        });
+    </script>
+</body>
+</html>

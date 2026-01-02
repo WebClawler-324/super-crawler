@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 调试工具 - 二手房平台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #667eea; margin-bottom: 20px; }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:hover { opacity: 0.9; }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .result pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+        }
+        .status { padding: 5px 10px; border-radius: 3px; display: inline-block; margin-bottom: 10px; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .log-entry { padding: 5px 0; border-bottom: 1px solid #eee; }
+        .log-entry.error { color: #dc3545; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.info { color: #17a2b8; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 API 调试工具</h1>
+        
+        <!-- 数据库连接检查 -->
+        <div class="section">
+            <h2>1. 数据库连接检查</h2>
+            <button class="btn btn-primary" onclick="checkDatabase()">检查数据库</button>
+            <div id="dbResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 热门房源 API 测试 -->
+        <div class="section">
+            <h2>2. 热门房源 API 测试 (/api/houses/popular)</h2>
+            <button class="btn btn-primary" onclick="testPopularHouses()">测试 API</button>
+            <button class="btn btn-success" onclick="testPopularHousesRaw()">查看原始响应</button>
+            <div id="popularResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 房源列表 API 测试 -->
+        <div class="section">
+            <h2>3. 房源列表 API 测试 (/api/houses)</h2>
+            <button class="btn btn-primary" onclick="testHousesList()">测试 API</button>
+            <div id="housesResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 收藏数据检查 -->
+        <div class="section">
+            <h2>4. 收藏数据检查 (/api/debug/favorites)</h2>
+            <button class="btn btn-primary" onclick="testFavorites()">检查收藏数据</button>
+            <div id="favoritesResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 统计 API 测试 -->
+        <div class="section">
+            <h2>5. 统计 API 测试 (/api/houses/statistics)</h2>
+            <button class="btn btn-primary" onclick="testStatistics()">测试 API</button>
+            <div id="statsResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 用户禁用功能测试 -->
+        <div class="section">
+            <h2>6. 用户禁用功能测试</h2>
+            <div class="input-group">
+                <label>测试用户名</label>
+                <input type="text" id="testUsername" placeholder="输入要测试的用户名">
+            </div>
+            <div class="input-group">
+                <label>测试密码</label>
+                <input type="password" id="testPassword" placeholder="输入密码">
+            </div>
+            <button class="btn btn-primary" onclick="testDisabledLogin()">测试禁用用户登录</button>
+            <div id="disabledLoginResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 百度地图配置测试 -->
+        <div class="section">
+            <h2>7. 百度地图配置测试</h2>
+            <button class="btn btn-primary" onclick="testBaiduMapConfig()">测试地图配置</button>
+            <button class="btn btn-success" onclick="testBaiduMapLoad()">测试地图加载</button>
+            <button class="btn btn-secondary" onclick="testHouseDetailPage()" style="background:#6c757d;color:white;">测试房源详情页</button>
+            <div id="baiduMapResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 完整诊断 -->
+        <div class="section">
+            <h2>8. 完整诊断报告</h2>
+            <button class="btn btn-danger" onclick="runFullDiagnosis()">运行完整诊断</button>
+            <div id="diagnosisResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 日志 -->
+        <div class="section">
+            <h2>📋 调试日志</h2>
+            <button class="btn btn-secondary" onclick="clearLogs()" style="background:#6c757d;color:white;">清空日志</button>
+            <div id="logs" class="result" style="display:block; min-height: 200px;"></div>
+        </div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        async function fetchAPI(url, options = {}) {
+            log(`请求: ${options.method || 'GET'} ${url}`);
+            const startTime = Date.now();
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                const elapsed = Date.now() - startTime;
+                log(`响应: ${response.status} ${response.statusText} (${elapsed}ms)`, response.ok ? 'success' : 'error');
+                
+                const text = await response.text();
+                try {
+                    return { success: true, data: JSON.parse(text), raw: text, status: response.status };
+                } catch (e) {
+                    return { success: true, data: null, raw: text, status: response.status, parseError: e.message };
+                }
+            } catch (error) {
+                log(`错误: ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+        
+        function showResult(elementId, content) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.innerHTML = content;
+        }
+        
+        async function checkDatabase() {
+            log('检查数据库连接...');
+            const result = await fetchAPI('/api/houses?limit=1');
+            let html = '';
+            if (result.success && result.data && result.data.success) {
+                html = `<div class="status success">✅ 数据库连接正常</div>`;
+                html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                log('数据库连接正常', 'success');
+            } else {
+                html = `<div class="status error">❌ 数据库连接失败</div>`;
+                html += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('数据库连接失败', 'error');
+            }
+            showResult('dbResult', html);
+        }
+        
+        async function testPopularHouses() {
+            log('测试热门房源 API...');
+            const result = await fetchAPI('/api/houses/popular');
+            let html = '';
+            
+            if (result.success) {
+                if (result.data && result.data.success) {
+                    const houses = result.data.data || [];
+                    html = `<div class="status success">✅ API 调用成功</div>`;
+                    html += `<p><strong>返回房源数量:</strong> ${houses.length}</p>`;
+                    
+                    if (houses.length > 0) {
+                        html += `<table>
+                            <tr><th>#</th><th>ID</th><th>标题</th><th>小区</th><th>收藏数</th><th>价格</th></tr>`;
+                        houses.forEach((h, i) => {
+                            html += `<tr>
+                                <td>${i+1}</td>
+                                <td>${h.ID || h.id || '-'}</td>
+                                <td>${h.houseTitle || '-'}</td>
+                                <td>${h.communityName || '-'}</td>
+                                <td>${h.favorite_count || 0}</td>
+                                <td>${h.price || '-'}万</td>
+                            </tr>`;
+                        });
+                        html += `</table>`;
+                        log(`成功获取 ${houses.length} 条热门房源`, 'success');
+                    } else {
+                        html += `<div class="status error">⚠️ 返回数据为空数组</div>`;
+                        log('返回数据为空', 'error');
+                    }
+                } else {
+                    html = `<div class="status error">❌ API 返回失败</div>`;
+                    html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    log('API 返回失败: ' + (result.data?.message || '未知错误'), 'error');
+                }
+            } else {
+                html = `<div class="status error">❌ 请求失败: ${result.error}</div>`;
+            }
+            
+            showResult('popularResult', html);
+        }
+        
+        async function testPopularHousesRaw() {
+            log('获取热门房源原始响应...');
+            const result = await fetchAPI('/api/houses/popular');
+            let html = `<div class="status ${result.success ? 'success' : 'error'}">
+                HTTP ${result.status || 'N/A'}
+            </div>`;
+            html += `<p><strong>原始响应:</strong></p>`;
+            html += `<pre>${result.raw || result.error || '无数据'}</pre>`;
+            
+            if (result.parseError) {
+                html += `<div class="status error">JSON 解析错误: ${result.parseError}</div>`;
+            }
+            
+            showResult('popularResult', html);
+        }
+        
+        async function testHousesList() {
+            log('测试房源列表 API...');
+            const result = await fetchAPI('/api/houses?limit=5');
+            let html = '';
+            
+            if (result.success && result.data && result.data.success) {
+                const houses = result.data.data || [];
+                html = `<div class="status success">✅ API 调用成功</div>`;
+                html += `<p><strong>返回房源数量:</strong> ${houses.length}</p>`;
+                
+                if (houses.length > 0) {
+                    html += `<p><strong>第一条数据字段:</strong></p>`;
+                    html += `<pre>${JSON.stringify(Object.keys(houses[0]), null, 2)}</pre>`;
+                    html += `<p><strong>第一条数据内容:</strong></p>`;
+                    html += `<pre>${JSON.stringify(houses[0], null, 2)}</pre>`;
+                    log(`成功获取 ${houses.length} 条房源`, 'success');
+                }
+            } else {
+                html = `<div class="status error">❌ API 调用失败</div>`;
+                html += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            }
+            
+            showResult('housesResult', html);
+        }
+        
+        async function testFavorites() {
+            log('检查收藏数据...');
+            const result = await fetchAPI('/api/debug/favorites');
+            let html = '';
+            
+            if (result.success && result.data) {
+                html = `<div class="status success">✅ 调试接口响应</div>`;
+                html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                html = `<div class="status error">❌ 调试接口不可用 (可能需要添加)</div>`;
+                html += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('调试接口不可用', 'error');
+            }
+            
+            showResult('favoritesResult', html);
+        }
+        
+        async function testStatistics() {
+            log('测试统计 API...');
+            const result = await fetchAPI('/api/houses/statistics');
+            let html = '';
+            
+            if (result.success && result.data) {
+                html = `<div class="status success">✅ API 调用成功</div>`;
+                html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                log('统计 API 正常', 'success');
+            } else {
+                html = `<div class="status error">❌ API 调用失败</div>`;
+                html += `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            }
+            
+            showResult('statsResult', html);
+        }
+        
+        async function testDisabledLogin() {
+            const username = document.getElementById('testUsername').value;
+            const password = document.getElementById('testPassword').value;
+            
+            if (!username || !password) {
+                showResult('disabledLoginResult', '<div class="status error">请输入用户名和密码</div>');
+                return;
+            }
+            
+            log(`测试用户 ${username} 登录...`);
+            
+            const result = await fetchAPI('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            
+            let html = '';
+            if (result.success && result.data) {
+                if (result.data.success) {
+                    html = `<div class="status error">❌ 测试失败：禁用用户仍然能登录！</div>`;
+                    html += `<p>登录成功，但用户应该被禁用。请检查：</p>`;
+                    html += `<ul>
+                        <li>用户是否确实被禁用 (is_disabled = 1)</li>
+                        <li>服务器代码是否已更新</li>
+                        <li>getUserByUsername 是否返回 is_disabled 字段</li>
+                    </ul>`;
+                    html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    log('禁用用户仍能登录 - 测试失败', 'error');
+                } else {
+                    const message = result.data.message || '';
+                    if (message.includes('禁用') || message.includes('disabled')) {
+                        html = `<div class="status success">✅ 测试成功：禁用用户无法登录</div>`;
+                        html += `<p>错误消息: ${message}</p>`;
+                        log('禁用用户正确拦截 - 测试成功', 'success');
+                    } else if (message.includes('密码错误') || message.includes('用户名')) {
+                        html = `<div class="status pending">⚠️ 用户名或密码错误</div>`;
+                        html += `<p>无法测试禁用功能，请检查用户名和密码</p>`;
+                        log('用户名或密码错误', 'error');
+                    } else {
+                        html = `<div class="status pending">❓ 未知登录失败原因</div>`;
+                        html += `<p>消息: ${message}</p>`;
+                    }
+                }
+                html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                html = `<div class="status error">❌ 请求失败: ${result.error}</div>`;
+            }
+            
+            showResult('disabledLoginResult', html);
+        }
+        
+        async function testBaiduMapConfig() {
+            log('测试百度地图配置...');
+            const result = await fetchAPI('/api/config');
+            let html = '';
+            
+            if (result.success && result.data) {
+                if (result.data.success && result.data.data && result.data.data.baidu_map) {
+                    const apiKey = result.data.data.baidu_map.api_key;
+                    html = `<div class="status success">✅ 百度地图配置正常</div>`;
+                    html += `<p><strong>API Key:</strong> ${apiKey ? apiKey.substring(0, 10) + '...' : '未配置'}</p>`;
+                    if (!apiKey || apiKey === 'YOUR_BAIDU_MAP_AK') {
+                        html += `<div class="status error">⚠️ 警告: API Key 未正确配置</div>`;
+                        html += `<p>请在 config/config.json 中配置真实的百度地图 API Key</p>`;
+                    }
+                    html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    log('百度地图配置获取成功', 'success');
+                } else {
+                    html = `<div class="status error">❌ 百度地图配置缺失</div>`;
+                    html += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    log('百度地图配置缺失', 'error');
+                }
+            } else {
+                html = `<div class="status error">❌ 获取配置失败: ${result.error}</div>`;
+            }
+            
+            showResult('baiduMapResult', html);
+        }
+        
+        async function testBaiduMapLoad() {
+            log('测试百度地图API加载...');
+            let html = '';
+            
+            try {
+                // 获取配置
+                const configResult = await fetchAPI('/api/config');
+                if (!configResult.success || !configResult.data?.success) {
+                    html = `<div class="status error">❌ 无法获取配置</div>`;
+                    showResult('baiduMapResult', html);
+                    return;
+                }
+                
+                const apiKey = configResult.data.data?.baidu_map?.api_key;
+                if (!apiKey) {
+                    html = `<div class="status error">❌ API Key 未配置</div>`;
+                    showResult('baiduMapResult', html);
+                    return;
+                }
+                
+                html = `<div class="status pending">⏳ 正在加载百度地图API...</div>`;
+                html += `<p>API Key: ${apiKey.substring(0, 10)}...</p>`;
+                showResult('baiduMapResult', html);
+                
+                // 动态加载百度地图脚本
+                const script = document.createElement('script');
+                script.src = `https://api.map.baidu.com/api?v=3.0&ak=${apiKey}`;
+                
+                script.onload = () => {
+                    html = `<div class="status success">✅ 百度地图API加载成功</div>`;
+                    html += `<p>BMap对象: ${typeof BMap !== 'undefined' ? '已定义' : '未定义'}</p>`;
+                    html += `<p>可以在房源详情页正常使用地图功能</p>`;
+                    showResult('baiduMapResult', html);
+                    log('百度地图API加载成功', 'success');
+                };
+                
+                script.onerror = () => {
+                    html = `<div class="status error">❌ 百度地图API加载失败</div>`;
+                    html += `<p>可能原因:</p>`;
+                    html += `<ul>
+                        <li>API Key 无效或已过期</li>
+                        <li>网络连接问题</li>
+                        <li>百度地图服务不可用</li>
+                    </ul>`;
+                    showResult('baiduMapResult', html);
+                    log('百度地图API加载失败', 'error');
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                html = `<div class="status error">❌ 测试失败: ${error.message}</div>`;
+                showResult('baiduMapResult', html);
+            }
+        }
+        
+        async function testHouseDetailPage() {
+            log('测试房源详情页地图功能...');
+            let html = '';
+            
+            // 1. 检查是否有房源
+            const housesResult = await fetchAPI('/api/houses?limit=1');
+            if (!housesResult.success || !housesResult.data?.success || !housesResult.data.data?.length) {
+                html = `<div class="status error">❌ 没有房源数据，无法测试</div>`;
+                html += `<p>请先导入房源数据</p>`;
+                showResult('baiduMapResult', html);
+                return;
+            }
+            
+            const firstHouse = housesResult.data.data[0];
+            html = `<div class="status success">✅ 找到测试房源</div>`;
+            html += `<p><strong>房源ID:</strong> ${firstHouse.ID}</p>`;
+            html += `<p><strong>标题:</strong> ${firstHouse.houseTitle}</p>`;
+            html += `<p><strong>小区:</strong> ${firstHouse.communityName}</p>`;
+            
+            // 2. 检查地图配置
+            const configResult = await fetchAPI('/api/config');
+            if (!configResult.success || !configResult.data?.success) {
+                html += `<div class="status error">❌ 地图配置获取失败</div>`;
+                showResult('baiduMapResult', html);
+                return;
+            }
+            
+            const apiKey = configResult.data.data?.baidu_map?.api_key;
+            html += `<div class="status success">✅ 地图配置正常</div>`;
+            html += `<p><strong>API Key:</strong> ${apiKey ? apiKey.substring(0, 10) + '...' : '未配置'}</p>`;
+            
+            // 3. 打开房源详情页
+            html += `<div class="status pending">📍 可以测试房源详情页了</div>`;
+            html += `<p><a href="/house-detail.html?id=${firstHouse.ID}" target="_blank" style="color:#667eea;font-weight:600;">
+                点击这里打开房源详情页 →
+            </a></p>`;
+            html += `<p style="margin-top:1rem;"><strong>调试步骤:</strong></p>`;
+            html += `<ol style="margin-left:2rem;">
+                <li>点击上方链接打开房源详情页</li>
+                <li>按F12打开浏览器开发者工具</li>
+                <li>查看Console标签页的日志输出</li>
+                <li>检查是否有以下日志：
+                    <ul>
+                        <li>"获取百度地图配置..."</li>
+                        <li>"开始加载百度地图脚本..."</li>
+                        <li>"百度地图加载成功"</li>
+                        <li>"initMap 被调用，地址: xxx"</li>
+                    </ul>
+                </li>
+                <li>查看地图是否正常显示</li>
+            </ol>`;
+            
+            showResult('baiduMapResult', html);
+            log('房源详情页测试信息已生成', 'success');
+        }
+        
+        async function runFullDiagnosis() {
+            log('开始完整诊断...', 'info');
+            let report = [];
+            
+            // 1. 检查房源列表
+            report.push('=== 1. 房源列表检查 ===');
+            const houses = await fetchAPI('/api/houses?limit=100');
+            if (houses.success && houses.data?.success) {
+                const count = houses.data.data?.length || 0;
+                report.push(`✅ 房源总数: ${count}`);
+                if (count === 0) {
+                    report.push('⚠️ 警告: 数据库中没有房源数据！');
+                }
+            } else {
+                report.push('❌ 房源列表获取失败');
+            }
+            
+            // 2. 检查热门房源
+            report.push('\n=== 2. 热门房源检查 ===');
+            const popular = await fetchAPI('/api/houses/popular');
+            report.push(`HTTP 状态: ${popular.status}`);
+            report.push(`响应内容: ${popular.raw?.substring(0, 500) || '空'}`);
+            if (popular.success && popular.data?.success) {
+                const count = popular.data.data?.length || 0;
+                report.push(`✅ 热门房源数: ${count}`);
+                if (count > 0) {
+                    report.push('第一条数据:');
+                    report.push(JSON.stringify(popular.data.data[0], null, 2));
+                }
+            } else {
+                report.push('❌ 热门房源获取失败');
+                report.push('错误信息: ' + (popular.data?.message || popular.error || '未知'));
+            }
+            
+            // 3. 检查统计数据
+            report.push('\n=== 3. 统计数据检查 ===');
+            const stats = await fetchAPI('/api/houses/statistics');
+            if (stats.success && stats.data?.success) {
+                report.push('✅ 统计数据正常');
+                report.push(JSON.stringify(stats.data.data, null, 2));
+            } else {
+                report.push('❌ 统计数据获取失败');
+            }
+            
+            // 4. 总结
+            report.push('\n=== 诊断总结 ===');
+            const housesOk = houses.success && houses.data?.success && (houses.data.data?.length || 0) > 0;
+            const popularOk = popular.success && popular.data?.success && (popular.data.data?.length || 0) > 0;
+            
+            if (!housesOk) {
+                report.push('❌ 问题: 没有房源数据，请先导入房源');
+            }
+            if (housesOk && !popularOk) {
+                report.push('❌ 问题: 有房源但热门房源为空');
+                report.push('   可能原因:');
+                report.push('   1. /api/houses/popular 路由未正确匹配');
+                report.push('   2. getPopularHouses() SQL 查询出错');
+                report.push('   3. 服务器代码未更新');
+            }
+            if (housesOk && popularOk) {
+                report.push('✅ 所有检查通过！');
+            }
+            
+            log('诊断完成', 'success');
+            showResult('diagnosisResult', `<pre>${report.join('\n')}</pre>`);
+        }
+        
+        // 页面加载时自动运行简单检查
+        window.onload = function() {
+            log('调试工具已加载');
+            log('点击按钮开始测试各个 API');
+        };
+    </script>
+</body>
+</html>

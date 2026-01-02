@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密码修改功能诊断</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body {
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .diagnostic-section {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-form {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .log-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-info { color: #9cdcfe; }
+        .log-warn { color: #dcdcaa; }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-pass { background: #4caf50; }
+        .status-fail { background: #f44336; }
+        .status-pending { background: #ff9800; }
+        .check-item {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f5f5f5;
+            border-left: 4px solid #2196F3;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="diagnostic-section">
+        <h1>🔍 密码修改功能诊断工具</h1>
+        <p>此页面用于诊断密码修改功能的问题</p>
+
+        <h2>步骤 1：环境检查</h2>
+        <div id="envChecks"></div>
+        <button class="btn btn-primary" onclick="runEnvironmentChecks()">运行环境检查</button>
+
+        <h2>步骤 2：消息提示测试</h2>
+        <div class="btn-group" style="display: flex; gap: 10px; margin: 10px 0;">
+            <button class="btn btn-primary" onclick="testMessage('success', '成功消息测试')">测试成功消息</button>
+            <button class="btn btn-secondary" onclick="testMessage('error', '错误消息测试')">测试错误消息</button>
+            <button class="btn" onclick="testMessage('info', '信息消息测试')">测试信息消息</button>
+        </div>
+
+        <h2>步骤 3：表单提交测试</h2>
+        <div class="test-form">
+            <form id="testPasswordForm">
+                <div class="form-group">
+                    <label>当前密码（模拟）</label>
+                    <input type="password" id="testOldPassword" name="oldPassword" placeholder="输入任意密码">
+                </div>
+                <div class="form-group">
+                    <label>新密码</label>
+                    <input type="password" id="testNewPassword" name="newPassword" minlength="6" placeholder="至少6位">
+                </div>
+                <div class="form-group">
+                    <label>确认新密码</label>
+                    <input type="password" id="testConfirmPassword" name="confirmPassword" minlength="6">
+                </div>
+                <button type="submit" class="btn btn-primary">测试提交</button>
+            </form>
+        </div>
+
+        <h2>步骤 4：API 测试</h2>
+        <button class="btn btn-primary" onclick="testAPI()">测试 API 连接</button>
+
+        <h2>📋 诊断日志</h2>
+        <button class="btn btn-secondary btn-sm" onclick="clearLog()">清空日志</button>
+        <div class="log-output" id="logOutput"></div>
+    </div>
+
+    <script src="/js/common.js"></script>
+    <script>
+        // 日志系统
+        const logOutput = document.getElementById('logOutput');
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString('zh-CN');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logOutput.appendChild(logEntry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        function clearLog() {
+            logOutput.innerHTML = '';
+            addLog('日志已清空', 'info');
+        }
+
+        // 环境检查
+        function runEnvironmentChecks() {
+            const checksDiv = document.getElementById('envChecks');
+            checksDiv.innerHTML = '';
+            
+            addLog('开始环境检查...', 'info');
+            
+            const checks = [
+                {
+                    name: 'showMessage 函数',
+                    test: () => typeof showMessage === 'function',
+                    fix: 'common.js 未正确加载'
+                },
+                {
+                    name: 'apiRequest 函数',
+                    test: () => typeof apiRequest === 'function',
+                    fix: 'common.js 未正确加载'
+                },
+                {
+                    name: 'currentUser 变量',
+                    test: () => typeof currentUser !== 'undefined',
+                    fix: 'common.js 初始化失败'
+                },
+                {
+                    name: 'localStorage 可用',
+                    test: () => typeof localStorage !== 'undefined',
+                    fix: '浏览器不支持 localStorage'
+                },
+                {
+                    name: 'CSS 动画支持',
+                    test: () => {
+                        const el = document.createElement('div');
+                        return 'animation' in el.style;
+                    },
+                    fix: '浏览器不支持 CSS 动画'
+                }
+            ];
+
+            checks.forEach(check => {
+                const result = check.test();
+                const checkItem = document.createElement('div');
+                checkItem.className = 'check-item';
+                checkItem.innerHTML = `
+                    <span class="status-indicator status-${result ? 'pass' : 'fail'}"></span>
+                    <strong>${check.name}</strong>: ${result ? '✅ 通过' : '❌ 失败'}
+                    ${result ? '' : '<br><small style="color: #f44336;">解决方法: ' + check.fix + '</small>'}
+                `;
+                checksDiv.appendChild(checkItem);
+                
+                addLog(`${check.name}: ${result ? '通过' : '失败'}`, result ? 'success' : 'error');
+            });
+
+            addLog('环境检查完成', 'success');
+        }
+
+        // 测试消息
+        function testMessage(type, message) {
+            addLog(`显示${type}消息: ${message}`, 'info');
+            try {
+                showMessage(message, type);
+                addLog(`消息显示成功`, 'success');
+            } catch (error) {
+                addLog(`消息显示失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试表单提交
+        document.getElementById('testPasswordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            addLog('表单提交事件触发', 'info');
+            
+            const formData = new FormData(this);
+            const oldPassword = formData.get('oldPassword');
+            const newPassword = formData.get('newPassword');
+            const confirmPassword = formData.get('confirmPassword');
+            
+            addLog(`旧密码: ${oldPassword ? '***' : '(空)'}`, 'info');
+            addLog(`新密码: ${newPassword ? '***' : '(空)'}`, 'info');
+            addLog(`确认密码: ${confirmPassword ? '***' : '(空)'}`, 'info');
+            
+            if (!oldPassword || oldPassword.trim() === '') {
+                addLog('验证失败: 旧密码为空', 'error');
+                testMessage('error', '请输入当前密码');
+                return;
+            }
+            
+            if (!newPassword || newPassword.length < 6) {
+                addLog('验证失败: 新密码长度不足', 'error');
+                testMessage('error', '新密码至少需要6位');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                addLog('验证失败: 两次密码不一致', 'error');
+                testMessage('error', '两次输入的新密码不一致');
+                return;
+            }
+            
+            addLog('表单验证通过', 'success');
+            
+            // 模拟API请求
+            const requestData = {
+                userId: currentUser ? currentUser.userId : 0,
+                oldPassword: oldPassword,
+                newPassword: newPassword,
+                useEmailVerify: false
+            };
+            
+            addLog(`模拟API请求: ${JSON.stringify(requestData)}`, 'info');
+            testMessage('success', '表单验证通过！可以发送请求');
+        });
+
+        // 测试API
+        async function testAPI() {
+            addLog('测试API连接...', 'info');
+            
+            if (typeof apiRequest !== 'function') {
+                addLog('错误: apiRequest 函数不存在', 'error');
+                return;
+            }
+            
+            try {
+                // 测试一个公开的API端点
+                addLog('发送测试请求到 /api/houses', 'info');
+                const data = await apiRequest('/api/houses', {
+                    method: 'GET'
+                });
+                
+                addLog(`API响应: ${JSON.stringify(data).substring(0, 100)}...`, 'success');
+                testMessage('success', 'API连接正常');
+            } catch (error) {
+                addLog(`API请求失败: ${error.message}`, 'error');
+                testMessage('error', 'API连接失败');
+            }
+        }
+
+        // 页面加载完成
+        window.addEventListener('load', function() {
+            addLog('='.repeat(50), 'info');
+            addLog('诊断工具已加载', 'success');
+            addLog('浏览器: ' + navigator.userAgent, 'info');
+            addLog('当前用户: ' + (currentUser ? currentUser.username : '未登录'), 'info');
+            addLog('='.repeat(50), 'info');
+        });
+    </script>
+</body>
+</html>

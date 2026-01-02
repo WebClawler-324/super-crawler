@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI购房助手 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">首页</a>
+                <a href="/ai-assistant.html" class="nav-link active">AI助手</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="ai-section">
+            <h2>🤖 AI购房助手</h2>
+            
+            <div class="ai-tabs">
+                <button class="tab-btn active" data-tab="recommend">智能推荐</button>
+                <button class="tab-btn" data-tab="chat">智能问答</button>
+            </div>
+            
+            <!-- 智能推荐 -->
+            <div class="tab-content" id="recommend" style="display: block;">
+                <div class="recommend-form">
+                    <h3>描述您的购房需求</h3>
+                    <textarea id="requirement" rows="4" placeholder="例如：我想在市中心购买一套两室一厅的房子，预算在200-300万，面积80-100平米左右..."></textarea>
+                    
+                    <div class="filter-options">
+                        <h4>筛选条件（可选）</h4>
+                        <div class="filter-grid">
+                            <div class="form-group">
+                                <label>价格范围（万元）</label>
+                                <div class="input-group">
+                                    <input type="number" id="filterMinPrice" placeholder="最低">
+                                    <span>-</span>
+                                    <input type="number" id="filterMaxPrice" placeholder="最高">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>面积范围（㎡）</label>
+                                <div class="input-group">
+                                    <input type="number" id="filterMinArea" placeholder="最小">
+                                    <span>-</span>
+                                    <input type="number" id="filterMaxArea" placeholder="最大">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="recommendBtn">获取AI推荐</button>
+                </div>
+                
+                <div id="recommendResult" class="ai-result" style="display: none;">
+                    <h3>推荐结果</h3>
+                    <div id="recommendContent"></div>
+                </div>
+            </div>
+            
+            <!-- 智能问答 -->
+            <div class="tab-content" id="chat" style="display: none;">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-message assistant">
+                            <div class="chat-message-content markdown-body">
+                                您好！我是AI购房助手，有什么可以帮助您的吗？您可以询问关于房产、购房流程、政策等方面的问题。
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <textarea id="chatInput" rows="2" placeholder="输入您的问题..."></textarea>
+                        <button class="btn btn-primary" id="sendBtn">发送</button>
+                        <button class="btn btn-danger" id="cancelBtn" style="display: none;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .ai-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .ai-section h2 {
+            color: #667eea;
+            margin-bottom: 1.5rem;
+        }
+        
+        .ai-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .recommend-form textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-options {
+            margin: 1.5rem 0;
+        }
+        
+        .filter-options h4 {
+            margin-bottom: 1rem;
+            color: #666;
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .ai-result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .ai-result h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        #recommendContent {
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #f8f9fa;
+        }
+        
+        .chat-message {
+            margin-bottom: 1rem;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chat-message.user {
+            text-align: right;
+        }
+        
+        .chat-message.assistant {
+            text-align: left;
+        }
+        
+        .chat-message-content {
+            display: inline-block;
+            max-width: 70%;
+            padding: 1rem 1.5rem;
+            border-radius: 15px;
+            line-height: 1.6;
+        }
+        
+        .chat-message.user .chat-message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .chat-message.assistant .chat-message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chat-input-area {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        #cancelBtn {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
+        #cancelBtn:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+        
+        #cancelBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .chat-input-area textarea {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            font-family: inherit;
+        }
+        
+        .typing-indicator {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .spinner-border {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 0.15em solid #dee2e6;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+
+        .spinner-border-sm {
+            width: 0.9rem;
+            height: 0.9rem;
+            border-width: 0.12em;
+        }
+
+        .me-2 {
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
+        }
+        
+        .feedback-buttons {
+            margin-top: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .feedback-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .feedback-btn:hover {
+            background: #f0f0f0;
+            transform: scale(1.2);
+        }
+
+        /* Markdown 样式（简化版） */
+        .markdown-body {
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+        .markdown-body p { margin: 0.5rem 0; }
+        .markdown-body ul { padding-left: 1.2rem; margin: 0.5rem 0; }
+        .markdown-body li { margin: 0.25rem 0; }
+        .markdown-body code { background: #f5f5f5; padding: 0.2rem 0.35rem; border-radius: 4px; }
+        .markdown-body pre { background: #f5f5f5; padding: 0.75rem; border-radius: 6px; overflow: auto; }
+    </style>
+
+    <script src="/js/marked.min.js"></script>
+    <script src="/js/common.js"></script>
+    <script>
+        let chatHistory = [];
+        let currentAbortController = null;  // 用于取消AI请求
+        let currentTypingInterval = null;   // 用于取消打字动画
+
+        // 如果本地未成功加载marked，尝试CDN兜底，但不阻塞主流程
+        (function ensureMarkedFallback() {
+            if (window.marked) return;
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+            script.async = true;
+            script.onload = () => console.log('marked fallback loaded from CDN');
+            script.onerror = () => console.warn('marked fallback CDN load failed');
+            document.head.appendChild(script);
+        })();
+
+        // 将纯文本渲染为markdown的HTML，若marked不可用则降级为转义文本
+        function renderMarkdownSafe(text) {
+            if (!text) return '';
+            if (window.marked && typeof window.marked.parse === 'function') {
+                return window.marked.parse(text);
+            }
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.replace(/\n/g, '<br>');
+        }
+        
+        // AI推荐
+        async function getAIRecommendation() {
+            const requirement = document.getElementById('requirement').value;
+            
+            if (!requirement.trim()) {
+                showMessage('请描述您的购房需求', 'error');
+                return;
+            }
+            
+            const recommendBtn = document.getElementById('recommendBtn');
+            const recommendResult = document.getElementById('recommendResult');
+            const recommendContent = document.getElementById('recommendContent');
+            
+            // 显示加载状态
+            recommendBtn.disabled = true;
+            recommendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>正在分析...';
+            recommendResult.style.display = 'block';
+            recommendContent.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div><p class="mt-2">AI正在分析您的需求，请稍候...</p></div>';
+            
+            try {
+                // 构建筛选条件
+                const filters = {};
+                const minPrice = document.getElementById('filterMinPrice').value;
+                const maxPrice = document.getElementById('filterMaxPrice').value;
+                const minArea = document.getElementById('filterMinArea').value;
+                const maxArea = document.getElementById('filterMaxArea').value;
+                
+                if (minPrice) filters.minPrice = parseFloat(minPrice);
+                if (maxPrice) filters.maxPrice = parseFloat(maxPrice);
+                if (minArea) filters.minArea = parseFloat(minArea);
+                if (maxArea) filters.maxArea = parseFloat(maxArea);
+                
+                const data = await apiRequest('/api/ai/recommend', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        requirement: requirement,
+                        filters: filters
+                    })
+                });
+                
+                if (data.success && data.data) {
+                    recommendContent.innerHTML = '<div class="markdown-body">' + renderMarkdownSafe(data.data.recommendation) + '</div>';
+                } else {
+                    recommendContent.innerHTML = '<div class="alert alert-danger">推荐失败：' + (data.message || '未知错误') + '</div>';
+                    showMessage(data.message || 'AI推荐失败', 'error');
+                }
+            } catch (error) {
+                console.error('AI推荐错误:', error);
+                recommendContent.innerHTML = '<div class="alert alert-danger">网络错误，请稍后重试</div>';
+                showMessage('网络连接失败，请稍后重试', 'error');
+            } finally {
+                // 恢复按钮状态
+                recommendBtn.disabled = false;
+                recommendBtn.textContent = '获取AI推荐';
+            }
+        }
+        
+        // 发送聊天消息
+        async function sendChatMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const message = chatInput.value.trim();
+            const sendBtn = document.getElementById('sendBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            
+            if (!message) {
+                return;
+            }
+            
+            // 添加用户消息到界面
+            addChatMessage(message, 'user');
+            chatInput.value = '';
+            
+            // 添加到历史记录
+            chatHistory.push({
+                role: 'user',
+                content: message
+            });
+            
+            // 创建AI消息容器（用于流式显示）
+            const aiMessageDiv = createChatMessage('', 'assistant');
+            const contentDiv = aiMessageDiv.querySelector('.chat-message-content');
+            contentDiv.innerHTML = '<span class="typing-indicator">AI正在思考...</span>';
+            
+            // 切换按钮状态
+            sendBtn.style.display = 'none';
+            cancelBtn.style.display = 'inline-block';
+            chatInput.disabled = true;
+            
+            // 创建 AbortController
+            currentAbortController = new AbortController();
+            
+            try {
+                const response = await fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        history: chatHistory
+                    }),
+                    signal: currentAbortController.signal
+                });
+                
+                // 检查是否被取消
+                if (currentAbortController.signal.aborted) {
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const aiResponse = data.data.response;
+                    
+                    // 移除加载指示器
+                    contentDiv.innerHTML = '';
+                    
+                    // 模拟打字效果（先逐字符显示纯文本，结束后渲染markdown）
+                    let index = 0;
+                    const typingSpeed = 30; // 毫秒
+                    let rawBuffer = '';
+                    
+                    function typeWriter() {
+                        // 检查是否被取消
+                        if (currentAbortController && currentAbortController.signal.aborted) {
+                            return;
+                        }
+                        
+                        if (index < aiResponse.length) {
+                            const ch = aiResponse.charAt(index);
+                            rawBuffer += ch;
+                            contentDiv.textContent = rawBuffer;
+                            index++;
+                            currentTypingInterval = setTimeout(typeWriter, typingSpeed);
+                            
+                            // 滚动到底部
+                            const messagesDiv = document.getElementById('chatMessages');
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                        } else {
+                            // 打字完成，添加到历史记录
+                            chatHistory.push({
+                                role: 'assistant',
+                                content: aiResponse
+                            });
+                            
+                            // 最终用markdown渲染
+                            contentDiv.innerHTML = '<div class="markdown-body">' + renderMarkdownSafe(aiResponse) + '</div>';
+                            
+                            // 添加反馈按钮
+                            addFeedbackButtons(aiMessageDiv);
+                            
+                            // 恢复按钮状态
+                            resetChatInputState();
+                        }
+                    }
+                    
+                    typeWriter();
+                } else {
+                    contentDiv.textContent = '抱歉，AI服务暂时不可用：' + (data.message || '未知错误');
+                    contentDiv.style.color = '#dc3545';
+                    resetChatInputState();
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    // 用户取消了请求
+                    contentDiv.innerHTML = '<span style="color: #999; font-style: italic;">已取消</span>';
+                    console.log('用户取消了AI请求');
+                } else {
+                    console.error('AI请求失败:', error);
+                    contentDiv.textContent = '抱歉，网络连接失败，请稍后重试';
+                    contentDiv.style.color = '#dc3545';
+                }
+                resetChatInputState();
+            }
+        }
+        
+        // 取消AI请求
+        function cancelChatMessage() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+            }
+            
+            if (currentTypingInterval) {
+                clearTimeout(currentTypingInterval);
+                currentTypingInterval = null;
+            }
+            
+            resetChatInputState();
+            console.log('AI请求已取消');
+        }
+        
+        // 重置聊天输入状态
+        function resetChatInputState() {
+            const sendBtn = document.getElementById('sendBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const chatInput = document.getElementById('chatInput');
+            
+            sendBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'none';
+            chatInput.disabled = false;
+            currentAbortController = null;
+            currentTypingInterval = null;
+        }
+        
+        // 创建聊天消息元素
+        function createChatMessage(content, role) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'chat-message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            
+            // 滚动到底部
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        // 添加聊天消息到界面（用户消息用纯文本，AI消息在打字后才渲染markdown）
+        function addChatMessage(content, role, isLoading = false) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'chat-message-content';
+            
+            // 用户消息直接显示文本，AI消息用markdown
+            if (role === 'user') {
+                contentDiv.textContent = content;
+            } else {
+                contentDiv.innerHTML = '<div class="markdown-body">' + renderMarkdownSafe(content) + '</div>';
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            
+            // 滚动到底部
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        // 添加反馈按钮
+        function addFeedbackButtons(messageDiv) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-buttons';
+            feedbackDiv.innerHTML = `
+                <button class="feedback-btn" onclick="provideFeedback(this, 'helpful')" title="有帮助">👍</button>
+                <button class="feedback-btn" onclick="provideFeedback(this, 'not-helpful')" title="没帮助">👎</button>
+            `;
+            messageDiv.appendChild(feedbackDiv);
+        }
+        
+        // 提供反馈
+        function provideFeedback(button, type) {
+            const feedbackDiv = button.parentElement;
+            if (type === 'helpful') {
+                feedbackDiv.innerHTML = '<span style="color: #28a745;">✓ 感谢您的反馈！</span>';
+                showMessage('感谢您的反馈，我们会继续改进', 'success');
+            } else {
+                feedbackDiv.innerHTML = '<span style="color: #dc3545;">我们会努力改进</span>';
+                showMessage('抱歉未能帮到您，我们会继续改进', 'info');
+            }
+        }
+        
+        // 事件监听
+        document.addEventListener('DOMContentLoaded', function() {
+            // 标签页切换
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    
+                    // 切换按钮状态
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 切换内容
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    document.getElementById(tabName).style.display = 'block';
+                });
+            });
+            
+            // AI推荐按钮
+            const recommendBtn = document.getElementById('recommendBtn');
+            if (recommendBtn) {
+                recommendBtn.addEventListener('click', getAIRecommendation);
+            }
+            
+            // 发送按钮
+            const sendBtn = document.getElementById('sendBtn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', sendChatMessage);
+            }
+            
+            // 取消按钮
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', cancelChatMessage);
+            }
+            
+            // 回车发送
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

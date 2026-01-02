@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的收藏 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">首页</a>
+                <a href="/favorites.html" class="nav-link active">我的收藏</a>
+                <a href="/statistics.html" class="nav-link">数据统计</a>
+                <a href="/ai-assistant.html" class="nav-link">AI助手</a>
+            </div>
+            <div class="nav-user">
+                <div class="user-info" id="userInfo">
+                    <span id="username"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/settings.html'">设置</button>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="favorites-section">
+            <h2>⭐ 我的收藏</h2>
+            
+            <div id="loadingIndicator" class="loading">加载中...</div>
+            
+            <div id="favoritesList" class="houses-grid">
+                <!-- 收藏的房源将动态插入 -->
+            </div>
+            
+            <div id="emptyMessage" style="display: none; text-align: center; padding: 3rem; color: #999;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📭</div>
+                <p style="font-size: 1.2rem;">还没有收藏任何房源</p>
+                <button class="btn btn-primary" onclick="window.location.href='/'">去看看</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .favorites-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .favorites-section h2 {
+            color: #667eea;
+            margin-bottom: 2rem;
+        }
+    </style>
+
+    <script src="/js/common.js"></script>
+    <script>
+        // 加载收藏列表
+        async function loadFavorites() {
+            // 检查登录状态
+            if (!currentUser) {
+                alert('请先登录');
+                window.location.href = '/';
+                return;
+            }
+            
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            const data = await apiRequest(`/api/favorites?userId=${currentUser.userId}`);
+            
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (data.success && data.data) {
+                const favorites = data.data;
+                displayFavorites(favorites);
+            } else {
+                showMessage(data.message || '加载失败', 'error');
+            }
+        }
+        
+        // 显示收藏列表
+        function displayFavorites(favorites) {
+            const favoritesList = document.getElementById('favoritesList');
+            const emptyMessage = document.getElementById('emptyMessage');
+            
+            if (favorites.length === 0) {
+                favoritesList.style.display = 'none';
+                emptyMessage.style.display = 'block';
+                return;
+            }
+            
+            favoritesList.innerHTML = '';
+            favorites.forEach(house => {
+                const card = createHouseCard(house);
+                favoritesList.appendChild(card);
+            });
+        }
+        
+        // 创建房源卡片
+        function createHouseCard(house) {
+            const card = document.createElement('div');
+            card.className = 'house-card';
+            card.innerHTML = `
+                <div class="house-image">🏠</div>
+                <div class="house-content">
+                    <h3 class="house-title">${house.houseTitle || '未命名房产'}</h3>
+                    <div class="house-info">
+                        <div class="house-info-item">
+                            <span>小区：</span>
+                            <span>${house.communityName || '-'}</span>
+                        </div>
+                        <div class="house-info-item">
+                            <span>户型：</span>
+                            <span>${house.houseType || '-'}</span>
+                        </div>
+                        <div class="house-info-item">
+                            <span>面积：</span>
+                            <span>${house.area || '-'} ㎡</span>
+                        </div>
+                        <div class="house-info-item">
+                            <span>楼层：</span>
+                            <span>${house.floor || '-'}</span>
+                        </div>
+                    </div>
+                    <div class="house-price">
+                        ¥ ${formatNumber(house.price)} 万
+                        <div class="house-unit-price">单价: ${formatNumber(house.unitPrice)} 元/㎡</div>
+                    </div>
+                    <div class="house-actions">
+                        <button class="btn btn-primary btn-sm" onclick="viewHouseDetail(${house.ID})">查看详情</button>
+                        <button class="btn btn-danger btn-sm" onclick="removeFavorite(${house.ID}, this)">取消收藏</button>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+        
+        // 查看房源详情
+        function viewHouseDetail(houseId) {
+            window.location.href = `/house-detail.html?id=${houseId}`;
+        }
+        
+        // 取消收藏
+        async function removeFavorite(houseId, button) {
+            if (!confirm('确定取消收藏吗？')) {
+                return;
+            }
+            
+            const data = await apiRequest('/api/favorites', {
+                method: 'DELETE',
+                body: JSON.stringify({
+                    userId: currentUser.userId,
+                    houseId: houseId
+                })
+            });
+            
+            if (data.success) {
+                showMessage('已取消收藏', 'success');
+                loadFavorites(); // 重新加载列表
+            } else {
+                showMessage(data.message, 'error');
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            if (currentUser) {
+                document.getElementById('username').textContent = currentUser.username;
+            }
+            loadFavorites();
+        });
+    </script>
+</body>
+</html>

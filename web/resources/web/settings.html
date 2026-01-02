@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账户设置 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">首页</a>
+            </div>
+            <div class="nav-user">
+                <div class="user-info">
+                    <span id="username"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="settings-section">
+            <h2>⚙️ 账户设置</h2>
+            
+            <!-- 用户信息 -->
+            <div class="settings-card">
+                <h3>基本信息</h3>
+                <div class="info-item">
+                    <span class="info-label">用户名：</span>
+                    <span class="info-value" id="displayUsername"></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">邮箱：</span>
+                    <span class="info-value" id="displayEmail"></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">账户类型：</span>
+                    <span class="info-value" id="displayRole"></span>
+                </div>
+            </div>
+            
+            <!-- 修改密码 -->
+            <div class="settings-card">
+                <h3>修改密码</h3>
+                <form id="changePasswordForm">
+                    <div class="form-group" id="oldPasswordGroup">
+                        <label>当前密码</label>
+                        <input type="password" name="oldPassword" id="oldPasswordInput" required>
+                    </div>
+                    
+                    <div class="form-group" id="emailVerifyGroup" style="display: none;">
+                        <label>邮箱验证码</label>
+                        <div class="input-group">
+                            <input type="text" name="code" id="codeInput">
+                            <button type="button" class="btn btn-secondary" id="sendCodeBtn">发送验证码</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>新密码</label>
+                        <input type="password" name="newPassword" id="newPasswordInput" required minlength="6">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>确认新密码</label>
+                        <input type="password" name="confirmPassword" id="confirmPasswordInput" required minlength="6">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useEmailVerify">
+                            使用邮箱验证（更安全）
+                        </label>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">修改密码</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .settings-section {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .settings-section h2 {
+            color: #667eea;
+            margin-bottom: 2rem;
+        }
+        
+        .settings-card {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        
+        .settings-card h3 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .info-item {
+            display: flex;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            width: 150px;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+    </style>
+
+    <script src="/js/common.js"></script>
+    <script>
+        let sendCodeTimer = null;
+        
+        // 加载用户信息
+        async function loadUserInfo() {
+            // 检查登录状态
+            if (!currentUser) {
+                alert('请先登录');
+                window.location.href = '/';
+                return;
+            }
+            
+            document.getElementById('username').textContent = currentUser.username;
+            document.getElementById('displayUsername').textContent = currentUser.username;
+            document.getElementById('displayEmail').textContent = currentUser.email || '未绑定';
+            document.getElementById('displayRole').textContent = currentUser.isAdmin ? '管理员' : '普通用户';
+            
+            // 如果是管理员，禁用邮箱验证选项
+            if (currentUser.isAdmin) {
+                const emailCheckbox = document.getElementById('useEmailVerify');
+                const checkboxLabel = emailCheckbox.closest('.checkbox-label');
+                emailCheckbox.disabled = true;
+                emailCheckbox.checked = false;
+                
+                // 添加禁用样式和提示
+                checkboxLabel.style.opacity = '0.5';
+                checkboxLabel.style.cursor = 'not-allowed';
+                checkboxLabel.title = '管理员不允许使用邮箱验证修改密码，请使用旧密码验证';
+                
+                // 在复选框后添加提示文本
+                const hint = document.createElement('span');
+                hint.style.cssText = 'color: #f44336; font-size: 12px; margin-left: 10px;';
+                hint.textContent = '(管理员仅限使用旧密码验证)';
+                checkboxLabel.appendChild(hint);
+            }
+        }
+        
+        // 切换验证方式
+        document.getElementById('useEmailVerify').addEventListener('change', function() {
+            const useEmail = this.checked;
+            const oldPasswordGroup = document.getElementById('oldPasswordGroup');
+            const emailVerifyGroup = document.getElementById('emailVerifyGroup');
+            const oldPasswordInput = document.getElementById('oldPasswordInput');
+            const codeInput = document.getElementById('codeInput');
+            
+            console.log('切换验证方式:', useEmail ? '邮箱验证' : '旧密码验证');
+            
+            if (useEmail) {
+                // 切换到邮箱验证
+                oldPasswordGroup.style.display = 'none';
+                emailVerifyGroup.style.display = 'block';
+                oldPasswordInput.required = false;
+                oldPasswordInput.value = '';
+                codeInput.required = true;
+            } else {
+                // 切换到旧密码验证
+                oldPasswordGroup.style.display = 'block';
+                emailVerifyGroup.style.display = 'none';
+                oldPasswordInput.required = true;
+                codeInput.required = false;
+                codeInput.value = '';
+            }
+        });
+        
+        // 发送验证码
+        document.getElementById('sendCodeBtn').addEventListener('click', async function() {
+            if (!currentUser || !currentUser.email) {
+                showMessage('您的账户未绑定邮箱', 'error');
+                return;
+            }
+            
+            const sendCodeBtn = this;
+            sendCodeBtn.disabled = true;
+            
+            const data = await apiRequest('/api/send-code', {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: currentUser.email,
+                    type: 'change_password'
+                })
+            });
+            
+            if (data.success) {
+                showMessage(data.message, 'success');
+                
+                // 倒计时
+                let countdown = 60;
+                sendCodeBtn.textContent = `${countdown}秒后重发`;
+                
+                sendCodeTimer = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(sendCodeTimer);
+                        sendCodeBtn.disabled = false;
+                        sendCodeBtn.textContent = '发送验证码';
+                    } else {
+                        sendCodeBtn.textContent = `${countdown}秒后重发`;
+                    }
+                }, 1000);
+            } else {
+                showMessage(data.message, 'error');
+                sendCodeBtn.disabled = false;
+            }
+        });
+        
+        // 修改密码
+        document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            console.log('密码修改表单提交');
+            
+            const formData = new FormData(this);
+            const newPassword = formData.get('newPassword');
+            const confirmPassword = formData.get('confirmPassword');
+            const useEmail = document.getElementById('useEmailVerify').checked;
+            
+            console.log('表单数据:', {
+                newPassword: newPassword ? '***' : '(空)',
+                confirmPassword: confirmPassword ? '***' : '(空)',
+                useEmail: useEmail
+            });
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('两次输入的新密码不一致', 'error');
+                return;
+            }
+            
+            if (!currentUser || !currentUser.userId) {
+                showMessage('登录状态已失效，请重新登录', 'error');
+                setTimeout(() => {
+                    logout();
+                }, 1500);
+                return;
+            }
+            
+            const requestData = {
+                userId: currentUser.userId,
+                newPassword: newPassword,
+                useEmailVerify: useEmail
+            };
+            
+            if (useEmail) {
+                const code = formData.get('code');
+                if (!code || code.trim() === '') {
+                    showMessage('请输入验证码', 'error');
+                    return;
+                }
+                requestData.code = code;
+                console.log('使用邮箱验证，验证码:', code);
+            } else {
+                const oldPassword = formData.get('oldPassword');
+                if (!oldPassword || oldPassword.trim() === '') {
+                    showMessage('请输入当前密码', 'error');
+                    return;
+                }
+                requestData.oldPassword = oldPassword;
+                console.log('使用旧密码验证，旧密码:', oldPassword ? '***' : '(空)');
+            }
+            
+            console.log('发送密码修改请求:', requestData);
+            
+            try {
+                const data = await apiRequest('/api/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+                
+                console.log('服务器响应:', data);
+                
+                if (data && data.success) {
+                    showMessage('密码修改成功，请重新登录', 'success');
+                    // 清空表单
+                    document.getElementById('changePasswordForm').reset();
+                    setTimeout(() => {
+                        logout();
+                    }, 2000);
+                } else {
+                    const errorMsg = data && data.message ? data.message : '密码修改失败，请重试';
+                    console.error('密码修改失败:', errorMsg);
+                    showMessage(errorMsg, 'error');
+                }
+            } catch (error) {
+                console.error('修改密码请求失败:', error);
+                showMessage('请求失败，请检查网络连接', 'error');
+            }
+        });
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟一点确保 common.js 已经加载完 localStorage
+            setTimeout(() => {
+                loadUserInfo();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

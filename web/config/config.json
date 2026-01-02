@@ -1,0 +1,38 @@
+  {
+  "database": {
+    "host": "your_database_host",
+    "port": 3306,
+    "database": "house_db",
+    "username": "your_database_username",
+    "password": "your_database_password"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "max_connections": 100
+  },
+  "email": {
+    "smtp_server": "smtp.126.com",
+    "smtp_port": 465,
+    "use_ssl": true,
+    "username": "your_email_username",
+    "password": "your_email_password",
+    "from_name": "二手房平台"
+  },
+  "deepseek": {
+    "api_key": "your_deepseek_api_key",
+    "api_url": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-chat",
+    "max_tokens": 2000,
+    "temperature": 0.7
+  },
+  "baidu_map": {
+    "api_key": "your_baidu_map_api_key",
+    "api_url": "https://api.map.baidu.com"
+  },
+  "security": {
+    "jwt_secret": "your_jwt_secret_key_change_this_in_production",
+    "password_salt": "your_password_salt",
+    "session_timeout": 86400
+  }
+}

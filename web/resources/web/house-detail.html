@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>房源详情 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">返回首页</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="house-detail-section">
+            <div id="loadingIndicator" class="loading">加载中...</div>
+            <div id="houseDetail" style="display: none;">
+                <div class="detail-header">
+                    <h2 id="houseTitle"></h2>
+                    <div class="detail-price">
+                        <span class="price-main" id="price"></span>
+                        <span class="price-unit" id="unitPrice"></span>
+                    </div>
+                </div>
+                
+                <div class="detail-content">
+                    <div class="detail-info">
+                        <h3>房源信息</h3>
+                        <table class="info-table">
+                            <tr>
+                                <td>小区名称</td>
+                                <td id="communityName"></td>
+                            </tr>
+                            <tr>
+                                <td>户型</td>
+                                <td id="houseType"></td>
+                            </tr>
+                            <tr>
+                                <td>面积</td>
+                                <td id="area"></td>
+                            </tr>
+                            <tr>
+                                <td>楼层</td>
+                                <td id="floor"></td>
+                            </tr>
+                            <tr>
+                                <td>房源链接</td>
+                                <td><a id="houseUrl" href="#" target="_blank">查看原始链接</a></td>
+                            </tr>
+                        </table>
+                        
+                        <div class="detail-actions">
+                            <button class="btn btn-primary" id="favoriteBtn">收藏</button>
+                            <button class="btn btn-secondary" onclick="window.history.back()">返回</button>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-map">
+                        <h3>位置信息</h3>
+                        <div id="baiduMap" style="width: 100%; height: 400px; border-radius: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .house-detail-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .detail-header {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .detail-header h2 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .detail-price {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+        
+        .price-main {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #dc3545;
+        }
+        
+        .price-unit {
+            font-size: 1rem;
+            color: #999;
+        }
+        
+        .detail-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .info-table {
+            width: 100%;
+            margin: 1rem 0;
+        }
+        
+        .info-table tr {
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-table td {
+            padding: 1rem;
+        }
+        
+        .info-table td:first-child {
+            font-weight: 600;
+            color: #666;
+            width: 30%;
+        }
+        
+        .detail-actions {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .detail-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <script src="/js/common.js"></script>
+    <script>
+        let currentHouseId = null;
+        let map = null;
+        let baiduMapLoaded = false;
+        let baiduMapApiKey = null;
+        let pendingMapAddress = null;
+        
+        // 百度地图加载完成的回调
+        window.initBaiduMap = function() {
+            console.log('百度地图API初始化回调触发');
+            baiduMapLoaded = true;
+            // 如果有待加载的地址，立即初始化地图
+            if (pendingMapAddress) {
+                setTimeout(() => initMap(pendingMapAddress), 100);
+            }
+        };
+        
+        // 加载百度地图API
+        async function loadBaiduMapAPI() {
+            if (baiduMapLoaded) {
+                console.log('百度地图已加载');
+                return true;
+            }
+            
+            if (typeof BMap !== 'undefined') {
+                console.log('BMap已存在');
+                baiduMapLoaded = true;
+                return true;
+            }
+            
+            try {
+                // 从服务器获取配置
+                console.log('获取百度地图配置...');
+                const response = await fetch('/api/config');
+                const result = await response.json();
+                
+                console.log('配置响应:', result);
+                
+                if (result.success && result.data && result.data.baidu_map) {
+                    baiduMapApiKey = result.data.baidu_map.api_key;
+                    console.log('获取到API Key:', baiduMapApiKey ? baiduMapApiKey.substring(0, 10) + '...' : 'null');
+                } else {
+                    console.error('无法获取百度地图配置:', result);
+                    return false;
+                }
+                
+                if (!baiduMapApiKey || baiduMapApiKey === 'YOUR_BAIDU_MAP_AK') {
+                    console.error('百度地图API Key未配置或无效');
+                    return false;
+                }
+                
+                // 动态加载百度地图脚本（使用回调）
+                return new Promise((resolve, reject) => {
+                    console.log('开始加载百度地图脚本...');
+                    const script = document.createElement('script');
+                    script.src = `https://api.map.baidu.com/api?v=3.0&ak=${baiduMapApiKey}&callback=initBaiduMap`;
+                    script.onerror = () => {
+                        console.error('百度地图脚本加载失败');
+                        reject(false);
+                    };
+                    
+                    // 设置超时
+                    const timeout = setTimeout(() => {
+                        if (!baiduMapLoaded) {
+                            console.error('百度地图加载超时');
+                            reject(false);
+                        }
+                    }, 10000);
+                    
+                    // 重写回调以支持Promise
+                    const originalCallback = window.initBaiduMap;
+                    window.initBaiduMap = function() {
+                        clearTimeout(timeout);
+                        originalCallback();
+                        console.log('百度地图加载成功');
+                        resolve(true);
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+            } catch (error) {
+                console.error('加载百度地图API失败:', error);
+                return false;
+            }
+        }
+        
+        // 获取房源详情
+        async function loadHouseDetail() {
+            const params = new URLSearchParams(window.location.search);
+            currentHouseId = params.get('id');
+            
+            if (!currentHouseId) {
+                showMessage('房源ID无效', 'error');
+                return;
+            }
+            
+            console.log('开始加载房源详情，ID:', currentHouseId);
+            
+            // 并行加载地图API和房源数据
+            const [mapLoadedPromise, houseDataPromise] = await Promise.allSettled([
+                loadBaiduMapAPI(),
+                apiRequest(`/api/houses/${currentHouseId}`)
+            ]);
+            
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            // 处理房源数据
+            if (houseDataPromise.status === 'fulfilled') {
+                const data = houseDataPromise.value;
+                if (data.success && data.data) {
+                    const house = data.data;
+                    displayHouseDetail(house);
+                    
+                    // 处理地图
+                    if (mapLoadedPromise.status === 'fulfilled' && mapLoadedPromise.value) {
+                        console.log('地图API已加载，准备初始化地图');
+                        // 使用房产标题或小区名称定位
+                        const address = house.communityName || house.houseTitle || '';
+                        if (baiduMapLoaded && typeof BMap !== 'undefined') {
+                            initMap(address);
+                        } else {
+                            console.log('等待地图API完全加载...');
+                            pendingMapAddress = address;
+                        }
+                    } else {
+                        console.error('地图API加载失败');
+                        document.getElementById('baiduMap').innerHTML = 
+                            '<p style="text-align: center; padding: 2rem; color: #999;">地图API加载失败，请检查网络连接或API Key配置</p>';
+                    }
+                } else {
+                    showMessage(data.message || '加载失败', 'error');
+                }
+            } else {
+                showMessage('加载房源数据失败', 'error');
+            }
+        }
+        
+        // 显示房源详情
+        function displayHouseDetail(house) {
+            document.getElementById('houseTitle').textContent = house.houseTitle || '未命名房产';
+            document.getElementById('price').textContent = `¥ ${formatNumber(house.price)} 万`;
+            document.getElementById('unitPrice').textContent = `单价: ${formatNumber(house.unitPrice)} 元/㎡`;
+            document.getElementById('communityName').textContent = house.communityName || '-';
+            document.getElementById('houseType').textContent = house.houseType || '-';
+            document.getElementById('area').textContent = house.area ? `${house.area} ㎡` : '-';
+            document.getElementById('floor').textContent = house.floor || '-';
+            
+            const urlLink = document.getElementById('houseUrl');
+            if (house.houseUrl) {
+                urlLink.href = house.houseUrl;
+            } else {
+                urlLink.style.display = 'none';
+            }
+            
+            document.getElementById('houseDetail').style.display = 'block';
+        }
+        
+        // 初始化百度地图
+        function initMap(address) {
+            console.log('initMap 被调用，地址:', address);
+            console.log('BMap 是否存在:', typeof BMap !== 'undefined');
+            
+            if (typeof BMap === 'undefined') {
+                console.error('百度地图API未加载');
+                document.getElementById('baiduMap').innerHTML = '<p style="text-align: center; padding: 2rem; color: #999;">地图API未加载，请检查网络连接</p>';
+                return;
+            }
+            
+            try {
+                console.log('开始创建地图对象...');
+                const mapContainer = document.getElementById('baiduMap');
+                if (!mapContainer) {
+                    console.error('地图容器不存在');
+                    return;
+                }
+                
+                map = new BMap.Map("baiduMap");
+                console.log('地图对象创建成功');
+                
+                // 默认中心点（北京）
+                const defaultPoint = new BMap.Point(116.404, 39.915);
+                map.centerAndZoom(defaultPoint, 11);
+                map.enableScrollWheelZoom(true);
+                map.addControl(new BMap.NavigationControl());
+                map.addControl(new BMap.ScaleControl());
+                
+                console.log('地图基础设置完成');
+                
+                // 地址解析
+                if (address && address !== '-' && address.trim() !== '') {
+                    console.log('开始地址解析:', address);
+                    const myGeo = new BMap.Geocoder();
+                    myGeo.getPoint(address, function(point) {
+                        if (point) {
+                            console.log('地址解析成功:', point);
+                            map.centerAndZoom(point, 16);
+                            const marker = new BMap.Marker(point);
+                            map.addOverlay(marker);
+                            
+                            const label = new BMap.Label(address, {offset: new BMap.Size(20, -10)});
+                            marker.setLabel(label);
+                            
+                            // 添加信息窗口
+                            const infoWindow = new BMap.InfoWindow(address);
+                            marker.addEventListener('click', function() {
+                                this.openInfoWindow(infoWindow);
+                            });
+                        } else {
+                            console.warn('地址解析失败，使用默认位置:', address);
+                            // 即使解析失败，也显示一个提示信息
+                            const marker = new BMap.Marker(defaultPoint);
+                            map.addOverlay(marker);
+                            const label = new BMap.Label('地址定位失败: ' + address, {offset: new BMap.Size(20, -10)});
+                            marker.setLabel(label);
+                        }
+                    }, "中国");
+                } else {
+                    console.warn('没有有效的地址信息，仅显示默认地图');
+                }
+            } catch (error) {
+                console.error('百度地图初始化失败:', error);
+                document.getElementById('baiduMap').innerHTML = '<p style="text-align: center; padding: 2rem; color: #999;">地图加载失败: ' + error.message + '</p>';
+            }
+        }
+        
+        // 切换收藏
+        async function toggleFavorite() {
+            if (!currentUser) {
+                showMessage('请先登录', 'error');
+                return;
+            }
+            
+            const favoriteBtn = document.getElementById('favoriteBtn');
+            const isFavorite = favoriteBtn.textContent === '取消收藏';
+            
+            const data = await apiRequest('/api/favorites', {
+                method: isFavorite ? 'DELETE' : 'POST',
+                body: JSON.stringify({
+                    userId: currentUser.userId,
+                    houseId: parseInt(currentHouseId)
+                })
+            });
+            
+            if (data.success) {
+                favoriteBtn.textContent = isFavorite ? '收藏' : '取消收藏';
+                favoriteBtn.className = isFavorite ? 'btn btn-primary' : 'btn btn-danger';
+                showMessage(data.message, 'success');
+            } else {
+                showMessage(data.message, 'error');
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHouseDetail();
+            
+            const favoriteBtn = document.getElementById('favoriteBtn');
+            if (favoriteBtn) {
+                favoriteBtn.addEventListener('click', toggleFavorite);
+            }
+        });
+    </script>
+</body>
+</html>

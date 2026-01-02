@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 二手房信息平台</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🏠 二手房平台 - 管理后台</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">返回首页</a>
+            </div>
+            <div class="nav-user">
+                <div class="user-info">
+                    <span id="username"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="admin-section">
+            <h2>🔧 管理后台</h2>
+            
+            <div id="loadingIndicator" class="loading">加载中...</div>
+            
+            <div id="adminContent" style="display: none;">
+                <!-- 统计概览 -->
+                <div class="admin-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value" id="totalUsers">0</div>
+                        <div class="stat-label">总用户数</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">🏘️</div>
+                        <div class="stat-value" id="totalHouses">0</div>
+                        <div class="stat-label">房源总数</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value" id="totalFavorites">0</div>
+                        <div class="stat-label">收藏总数</div>
+                    </div>
+                </div>
+                
+                <!-- 用户列表 -->
+                <div class="admin-card">
+                    <h3>用户管理</h3>
+                    <div id="usersList" class="users-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>邮箱</th>
+                                    <th>类型</th>
+                                    <th>状态</th>
+                                    <th>注册时间</th>
+                                    <th>最后登录</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="unauthorizedMessage" style="display: none; text-align: center; padding: 3rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
+                <h3>权限不足</h3>
+                <p>您没有管理员权限访问此页面</p>
+                <button class="btn btn-primary" onclick="window.location.href='/'">返回首页</button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 二手房信息平台. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+        .admin-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .admin-section h2 {
+            color: #dc3545;
+            margin-bottom: 2rem;
+        }
+        
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+        
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .admin-card {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        
+        .admin-card h3 {
+            color: #dc3545;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #dc3545;
+        }
+        
+        .users-table {
+            overflow-x: auto;
+        }
+        
+        .users-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .users-table th {
+            background: #dc3545;
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .users-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .users-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .user-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .user-badge.admin {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .user-badge.user {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+
+    <script src="/js/common.js"></script>
+    <script>
+        // 加载管理员数据
+        async function loadAdminData() {
+            // 检查管理员权限
+            if (!currentUser || !currentUser.isAdmin) {
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('unauthorizedMessage').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            // 并行加载用户统计和用户列表
+            const [statsData, usersData] = await Promise.all([
+                apiRequest('/api/admin/stats'),
+                apiRequest('/api/admin/users')
+            ]);
+            
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (statsData.success && statsData.data) {
+                displayStats(statsData.data);
+            }
+            
+            if (usersData.success && usersData.data) {
+                displayUsers(usersData.data);
+            }
+            
+            document.getElementById('adminContent').style.display = 'block';
+        }
+        
+        // 显示统计数据
+        function displayStats(stats) {
+            document.getElementById('totalUsers').textContent = formatNumber(stats.totalUsers || 0);
+            document.getElementById('totalHouses').textContent = formatNumber(stats.totalHouses || 0);
+            document.getElementById('totalFavorites').textContent = formatNumber(stats.totalFavorites || 0);
+        }
+        
+        // 显示用户列表
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                const isDisabled = user.is_disabled || false;
+                tr.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.email || '-'}</td>
+                    <td>
+                        <span class="user-badge ${user.is_admin ? 'admin' : 'user'}">
+                            ${user.is_admin ? '管理员' : '普通用户'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="user-badge ${isDisabled ? 'disabled' : 'active'}">
+                            ${isDisabled ? '已禁用' : '正常'}
+                        </span>
+                    </td>
+                    <td>${formatDate(user.created_at)}</td>
+                    <td>${user.last_login ? formatDate(user.last_login) : '从未登录'}</td>
+                    <td>
+                        ${user.is_admin ? '<span style="color: #999;">管理员</span>' : `
+                            <button class="btn btn-sm ${isDisabled ? 'btn-success' : 'btn-danger'}" 
+                                    onclick="toggleUserStatus(${user.id}, ${!isDisabled})">
+                                ${isDisabled ? '启用' : '禁用'}
+                            </button>
+                        `}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 切换用户状态
+        async function toggleUserStatus(userId, disabled) {
+            if (!confirm(`确定要${disabled ? '禁用' : '启用'}该用户吗？`)) {
+                return;
+            }
+            
+            const data = await apiRequest('/api/admin/toggle-user', {
+                method: 'POST',
+                body: JSON.stringify({ userId, disabled })
+            });
+            
+            if (data.success) {
+                showMessage(data.message, 'success');
+                // 重新加载用户列表
+                const usersData = await apiRequest('/api/admin/users');
+                if (usersData.success) {
+                    displayUsers(usersData.data);
+                }
+            } else {
+                showMessage(data.message, 'error');
+            }
+        }
+                // 切换用户状态
+        async function toggleUserStatus(userId, disabled) {
+            if (!confirm(`确定要${disabled ? '禁用' : '启用'}该用户吗？`)) {
+                return;
+            }
+            
+            const data = await apiRequest('/api/admin/toggle-user', {
+                method: 'POST',
+                body: JSON.stringify({ userId, disabled })
+            });
+            
+            if (data.success) {
+                showMessage(data.message, 'success');
+                const usersData = await apiRequest('/api/admin/users');
+                if (usersData.success) {
+                    displayUsers(usersData.data);
+                }
+            } else {
+                showMessage(data.message, 'error');
+            }
+        }
+                // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟一点确保 common.js 已经加载完 localStorage
+            setTimeout(() => {
+                if (currentUser) {
+                    document.getElementById('username').textContent = currentUser.username + ' (管理员)';
+                }
+                loadAdminData();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
