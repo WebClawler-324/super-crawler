@@ -1,4 +1,4 @@
-#ifndef CRAWLTHREADMANAGER_H
+/*#ifndef CRAWLTHREADMANAGER_H
 #define CRAWLTHREADMANAGER_H
 
 #include <QThread>
@@ -77,4 +77,4 @@ private:
     Ui::MainWindow *m_ui;     // 存储UI指针（用于爬虫类内部信号传递）
 };
 
-#endif // CRAWLTHREADMANAGER_H
+#endif // CRAWLTHREADMANAGER_H*/

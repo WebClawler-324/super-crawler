@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>百度地图3D接力路径规划（WebGL版）</title>
+    <script type="text/javascript" src="qwebchannel.js"></script>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+        #mapContainer { width: 100%; height: 100%; }
+        .control-btn { position: absolute; top: 50px; left: 10px; z-index: 999; padding: 8px 15px; background: white; border: 1px solid #ccc; cursor: pointer; margin-bottom: 5px; display: block; }
+    </style>
+</head>
+<body>
+    <div id="mapContainer"></div>
+
+    <script type="text/javascript">
+        var map, walkingRoute;
+        var allRoutes = [];
+        var allMarkers = [];
+        var locateMarker = null;
+        var qtBridge;
+        var qtRetryCount = 0;
+        var qtRetryMax = 500;
+
+        function initBaiduMap() {
+            if (!window.BMapGL || !document.getElementById('mapContainer')) {
+                setTimeout(initBaiduMap, 100);
+                return;
+            }
+
+            map = new BMapGL.Map("mapContainer", {
+                enableMapClick: true,
+                enableHightlight: false
+            });
+            var defaultCenter = new BMapGL.Point(116.404, 39.915);
+            map.centerAndZoom(defaultCenter, 14);
+            map.enableScrollWheelZoom(true);
+
+            walkingRoute = new BMapGL.WalkingRoute(map, {
+                renderOptions: { autoViewport: false, enableDragging: false }
+            });
+
+            initQtWebChannel();
+        }
+
+        // 适配当前段视野
+        function fitSegmentViewport(segmentPoints) {
+            if (segmentPoints.length === 0) return;
+            map.setViewport(segmentPoints, { margins: [30, 30, 30, 30] });
+        }
+
+        function drawGreenRoute(plan) {
+            if (!plan) return;
+
+            for (var i = 0; i < plan.getNumRoutes(); i++) {
+                var route = plan.getRoute(i);
+                var segmentPoints = route.getPath();
+
+                if (segmentPoints.length === 0) continue;
+
+                var newRoute = new BMapGL.Polyline(segmentPoints, {
+                    strokeColor: "#00FF00",
+                    strokeWeight: 8,
+                    strokeOpacity: 1,
+                    strokeStyle: "solid",
+                    zIndex: 9999
+                });
+
+                map.addOverlay(newRoute);
+                allRoutes.push(newRoute);
+                console.log(`✅ 绘制第 ${i+1} 条子路线，点数：${segmentPoints.length}`);
+
+                fitSegmentViewport(segmentPoints);
+            }
+        }
+
+        function addRelayRouteByAddresses(addresses) {
+           if (!Array.isArray(addresses) || addresses.length < 1) {
+                alert("请传入至少包含1个地址的数组！");
+                return;
+            }
+
+            const geoCoder = new BMapGL.Geocoder();
+
+            function geocode(address) {
+                return new Promise((resolve, reject) => {
+                    geoCoder.getPoint(address, (point) => {
+                        console.log(`[地理编码] ${address} →`, point ? `(${point.lng},${point.lat})` : "失败");
+                        point ? resolve(point) : reject(`地址解析失败：${address}`);
+                    }, "北京市");
+                });
+            }
+
+            function searchRoute(startPoint, endPoint) {
+                return new Promise((resolve, reject) => {
+                    console.log(`[路线搜索] 开始：(${startPoint.lng},${startPoint.lat}) → (${endPoint.lng},${endPoint.lat})`);
+                    const uniqueCallback = function(results) {
+                        walkingRoute.removeEventListener('searchcomplete', uniqueCallback);
+                        walkingRoute.setSearchCompleteCallback(null);
+
+                        if (walkingRoute.getStatus() === BMAP_STATUS_SUCCESS) {
+                            const plan = results.getPlan(0);
+                            drawGreenRoute(plan);
+                            resolve(results);
+                        } else {
+                            reject(`路线规划失败（状态码：${walkingRoute.getStatus()}）`);
+                        }
+                    };
+
+                    walkingRoute.addEventListener('searchcomplete', uniqueCallback);
+                    walkingRoute.setSearchCompleteCallback(uniqueCallback);
+                    walkingRoute.search(startPoint, endPoint);
+                });
+            }
+
+            // 差异化标记函数
+            function createRelayMarkers(point, labelText, isHighlight = false) {
+                var label = new BMapGL.Label(labelText, {
+                    position: point,
+                    offset: new BMapGL.Size(-15, -15)
+                });
+
+                let bgColor = "#ff4444";
+                if (labelText.startsWith("拐")) bgColor = "#ffa500";
+                if (labelText === "终") bgColor = "#0099ff";
+
+                label.setStyle({
+                    width: "30px",
+                    height: "30px",
+                    lineHeight: "30px",
+                    textAlign: "center",
+                    borderRadius: "50%",
+                    backgroundColor: bgColor,
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    border: "2px solid white",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                    padding: "0",
+                    margin: "0",
+                    zIndex: isHighlight ? 10000 : 9999
+                });
+
+                map.addOverlay(label);
+                allMarkers.push(label);
+            }
+
+            async function processSegment(index) {
+                if (index >= addresses.length - 1) {
+                    console.log("✅ 所有多点接力路径处理完成！");
+                    fitAllRoutesViewport();
+                    return;
+                }
+
+                try {
+                    const startAddr = addresses[index];
+                    const endAddr = addresses[index + 1];
+                    console.log(`🔄 处理第 ${index + 1} 段：${startAddr} → ${endAddr}`);
+
+                    const startPoint = await geocode(startAddr);
+                    const endPoint = await geocode(endAddr);
+                    if (!startPoint || !endPoint) throw new Error("地址解析结果为空");
+
+                    // 绘制标记
+                    if (index === 0) {
+                        createRelayMarkers(startPoint, "起", true);
+                    }
+                    const isFinalEnd = index === addresses.length - 2;
+                    const endLabelText = isFinalEnd ? "终" : `拐${index + 1}`;
+                    createRelayMarkers(endPoint, endLabelText, isFinalEnd);
+
+                    await searchRoute(startPoint, endPoint);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await processSegment(index + 1);
+                } catch (error) {
+                    console.error(`❌ 第 ${index + 1} 段失败：`, error);
+                    alert(`第 ${index + 1} 段失败：${error.message}`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await processSegment(index + 1);
+                }
+            }
+
+            setTimeout(() => processSegment(0), 500);
+        }
+
+        function testMultiPointRoute() {
+            addRelayRouteByAddresses([
+                "北京市东城区天安门广场",
+                "北京市东城区故宫博物院",
+                "北京市东城区王府井步行街南口",
+                "北京市朝阳区三里屯太古里北区"
+            ]);
+        }
+
+        function fitAllRoutesViewport() {
+            var allPoints = [];
+            allRoutes.forEach(function(route) {
+                allPoints = allPoints.concat(route.getPath());
+            });
+            allMarkers.forEach(function(marker) {
+                allPoints.push(marker.getPosition());
+            });
+
+            if (allPoints.length > 0) {
+                map.setViewport(allPoints, { margins: [50, 50, 50, 50] });
+            }
+        }
+
+        function clearAllRoutes() {
+            allRoutes.forEach(function(route) {
+                map.removeOverlay(route);
+            });
+            allMarkers.forEach(function(marker) {
+                map.removeOverlay(marker);
+            });
+            allRoutes = [];
+            allMarkers = [];
+            if (locateMarker) {
+                map.removeOverlay(locateMarker);
+                locateMarker = null;
+            }
+        }
+
+        function initQtWebChannel() {
+            const QWebChannelCtor = window.QWebChannel && (window.QWebChannel.QWebChannel || window.QWebChannel);
+            const transportReady = typeof qt !== 'undefined' && qt.webChannelTransport;
+
+            if (!QWebChannelCtor) {
+                if (++qtRetryCount > qtRetryMax) {
+                    console.error("QWebChannel脚本未加载，停止重试");
+                    return;
+                }
+                console.log("等待QWebChannel脚本加载，已重试", qtRetryCount);
+                return setTimeout(initQtWebChannel, 100);
+            }
+
+            if (!transportReady) {
+                if (++qtRetryCount > qtRetryMax) {
+                    console.error("Qt通信超时：未检测到qt.webChannelTransport");
+                    return;
+                }
+                console.log("等待Qt注入webChannelTransport，已重试", qtRetryCount);
+                return setTimeout(initQtWebChannel, 100);
+            }
+
+            console.log("检测到QWebChannel与Qt transport，开始建立通信");
+            new QWebChannelCtor(qt.webChannelTransport, function(channel) {
+                window.routeBridge = channel.objects.routeBridge;
+                console.log("Qt通信成功：已连接RouteBridge");
+
+                if (routeBridge.addRelayRouteByAddresses) {
+                    routeBridge.addRelayRouteByAddresses.connect(addRelayRouteByAddresses);
+                }
+
+                if (routeBridge.addRelayRouteByLngLat) {
+                    routeBridge.addRelayRouteByLngLat.connect(addRelayRouteByLngLat);
+                }
+
+                if (routeBridge.clearAllRoutes) {
+                    routeBridge.clearAllRoutes.connect(clearAllRoutes);
+                }
+
+                if (routeBridge.locateByAddress) {
+                    routeBridge.locateByAddress.connect(addressToPoint);
+                } else {
+                    console.warn("routeBridge缺少locateByAddress信号");
+                }
+            });
+        }
+
+        function addressToPoint(address) {
+            console.log("前端接收到Qt的地址：", address);
+
+            var localSearch = new BMapGL.LocalSearch(map, {
+                pageCapacity: 10,
+                onSearchComplete: function() {
+                    var status = localSearch.getStatus();
+                    if (status === BMAP_STATUS_SUCCESS) {
+                        var results = localSearch.getResults();
+                        if (results && results.getCurrentNumPois() > 0) {
+                            var poi = results.getPoi(0);
+                            if (poi && poi.point) {
+                                var point = poi.point;
+                                map.centerAndZoom(point, 20);
+                                map.enableInertialDragging(true);
+
+                                if (locateMarker) map.removeOverlay(locateMarker);
+                                locateMarker = new BMapGL.Label("📍", {
+                                    position: point,
+                                    offset: new BMapGL.Size(-15, -15)
+                                });
+                                locateMarker.setStyle({
+                                    width: "30px",
+                                    height: "30px",
+                                    lineHeight: "30px",
+                                    textAlign: "center",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#4cd964",
+                                    color: "white",
+                                    fontSize: "16px",
+                                    border: "2px solid white",
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                                    padding: "0",
+                                    margin: "0"
+                                });
+                                map.addOverlay(locateMarker);
+
+                                if (window.routeBridge && routeBridge.receiveLatLng) {
+                                    routeBridge.receiveLatLng(address, point.lng, point.lat);
+                                }
+                                console.log("POI精准定位成功：", address, "→", point.lng, point.lat);
+                                return;
+                            }
+                        }
+                    }
+                    console.warn("POI搜索无结果，降级为地理编码");
+                    geoCodeFallback(address);
+                }
+            });
+
+            localSearch.search(address, "北京市");
+        }
+
+        function geoCodeFallback(address) {
+            const myGeo = new BMapGL.Geocoder();
+            myGeo.getPoint(address, function(point) {
+                if (point) {
+                    map.centerAndZoom(point, 19);
+                    if (locateMarker) map.removeOverlay(locateMarker);
+                    locateMarker = new BMapGL.Label("📍", {
+                        position: point,
+                        offset: new BMapGL.Size(-15, -15)
+                    });
+                    locateMarker.setStyle({
+                        width: "30px",
+                        height: "30px",
+                        lineHeight: "30px",
+                        textAlign: "center",
+                        borderRadius: "50%",
+                        backgroundColor: "#4cd964",
+                        color: "white",
+                        fontSize: "16px",
+                        border: "2px solid white",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                        padding: "0",
+                        margin: "0"
+                    });
+                    map.addOverlay(locateMarker);
+
+                    if (window.routeBridge && routeBridge.receiveLatLng) {
+                        routeBridge.receiveLatLng(address, point.lng, point.lat);
+                    }
+                    console.log("地理编码定位成功：", address, "→", point.lng, point.lat);
+                } else {
+                    alert("地址解析失败！请尝试更具体的地址");
+                }
+            }, "北京市");
+        }
+
+        window.addressToPoint = addressToPoint;
+    </script>
+
+    <script src="https://api.map.baidu.com/api?v=1.0&type=webgl&ak=Cr2LMp0XizGpqTAtcE5N6j8V88BhaOZ9&callback=initBaiduMap&t=1735467890" async defer></script>
+</body>
+</html>

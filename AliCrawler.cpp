@@ -23,8 +23,8 @@ const QStringList AliCrawl::USER_AGENT_POOL = {
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 };
 
-// ===================== 核心修改：城市+行政区编码映射表 =====================
-// 嵌套映射：外层key=城市名，内层key=区名，value=区级编码
+// 城市+行政区编码映射表
+// 外层key=城市名，内层key=区名，value=区级编码
 QMap<QString, QMap<QString, QString>> AliCrawl::getRegionCodeMap() {
     QMap<QString, QMap<QString, QString>> regionCodeMap;
 
@@ -68,15 +68,15 @@ QMap<QString, QMap<QString, QString>> AliCrawl::getRegionCodeMap() {
     hangzhouRegions["拱墅区"] = "330105";
     regionCodeMap["杭州"] = hangzhouRegions;
 
-    // 可继续扩展其他城市的区级编码（格式：6位数字，前2位省，中间2位市，最后2位区）
+    // 可继续扩展其他城市的区级编码
     return regionCodeMap;
 }
 
-// ===================== 城市/区县转编码（替代原cityToPinyin）=====================
+//城市/区县转编码
 QString AliCrawl::regionToCode(const QString& cityName, const QString& districtName) {
     QMap<QString, QMap<QString, QString>> regionCodeMap = getRegionCodeMap();
 
-    // 1. 如果传入了区名，优先匹配区级编码
+    // 如果传入了区名，优先匹配区级编码
     if (!districtName.isEmpty()) {
         if (regionCodeMap.contains(cityName) && regionCodeMap[cityName].contains(districtName)) {
             return regionCodeMap[cityName][districtName]; // 返回区级编码（如北京朝阳区→110105）
@@ -85,7 +85,7 @@ QString AliCrawl::regionToCode(const QString& cityName, const QString& districtN
         return "";
     }
 
-    // 2. 未传入区名，返回城市级编码（兼容原有逻辑）
+    //返回城市级编码
     QMap<QString, QString> cityCodeMap = {
         {"北京", "110000"}, {"上海", "310000"}, {"广州", "440100"},
         {"深圳", "440300"}, {"杭州", "330100"}, {"南京", "320100"},
@@ -100,7 +100,6 @@ QString AliCrawl::regionToCode(const QString& cityName, const QString& districtN
     return "";
 }
 
-// ===================== 保留原有辅助函数（无需修改）=====================
 QString AliCrawl::getFirstLetter(int index) {
     const QStringList letters = {"A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N",
                                  "O", "P", "Q", "R", "S", "T", "W", "X", "Y", "Z"};
@@ -115,7 +114,7 @@ QString AliCrawl::getFirstLetter(int index) {
     return "A";
 }
 
-// ===================== 模拟真人行为（无需修改）=====================
+// 模拟真人行为
 void AliCrawl::simulateHumanBehavior() {
     QStringList jsScrolls = {
         QString("window.scrollTo(0, %1);").arg(QRandomGenerator::global()->bounded(300, 500)),
@@ -138,7 +137,7 @@ void AliCrawl::simulateHumanBehavior() {
     emit appendLogSignal("🤖 模拟浏览停留：" + QString::number(totalStayTime/1000) + "秒");
 }
 
-// ===================== Cookie管理（无需修改）=====================
+//Cookie管理
 void AliCrawl::loadCookiesFromFile(const QString& filePath) {
     QFile file(filePath.isEmpty() ? "ali_cookies.txt" : filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -167,7 +166,7 @@ void AliCrawl::saveCookiesToFile(const QString& filePath) {
     emit appendLogSignal(QString("✅ 阿里Cookie保存至：%1").arg(savePath));
 }
 
-// ===================== 工具函数（无需修改）=====================
+// 工具函数
 QString AliCrawl::generateRandomPvid() {
     const QString chars = "0123456789abcdefghijklmnopqrstuvwxyz";
     QString pvid;
@@ -194,7 +193,7 @@ int AliCrawl::getRandomInterval() {
     return QRandomGenerator::global()->bounded(MIN_REQUEST_INTERVAL, MAX_REQUEST_INTERVAL);
 }
 
-// ===================== 构造函数（无需修改）=====================
+//构造函数
 AliCrawl::AliCrawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindow* ui)
     : QObject(nullptr)
     , webPage(nullptr)
@@ -253,7 +252,7 @@ void AliCrawl::onInitFinishedLog() {
     emit appendLogSignal("💡 使用说明：输入城市名+区名（可选），点击爬取按钮（支持：北京-朝阳区、上海-浦东新区等）");
 }
 
-// ===================== 处理普通URL（无需修改）=====================
+// 处理普通URL
 void AliCrawl::processNextUrl() {
     if (urlQueue.isEmpty()) {
         emit appendLogSignal("\n=== 阿里房产首页爬取完成 ===");
@@ -288,7 +287,7 @@ void AliCrawl::processNextUrl() {
     webPage->load(request);
 }
 
-// ===================== 页面加载完成（无需修改）=====================
+// 页面加载完成
 void AliCrawl::onPageLoadFinished(bool ok) {
     if (this == nullptr || webPage == nullptr) return;
 
@@ -353,7 +352,7 @@ void AliCrawl::onPageLoadFinished(bool ok) {
     });
 }
 
-// ===================== 解析普通页面（无需修改）=====================
+// 解析普通页面
 void AliCrawl::extractAliData(const QString& html, const QString& currentUrl) {
     emit appendLogSignal("🔍 解析阿里页面...");
 
@@ -377,12 +376,12 @@ void AliCrawl::extractAliData(const QString& html, const QString& currentUrl) {
     emit appendLogSignal("✅ 解析完成：" + currentUrl);
 }
 
-// ===================== 提取房源数据（无需修改）=====================
+// 提取房源数据（
 void AliCrawl::extractHouseData(const QString& html)
 {
     emit appendLogSignal("🔍 开始提取阿里二手房房源数据...");
 
-    // 外层 houseRegex：去掉价格锚点（?:起拍价|当前价），仅依赖两个稳定锚点
+    // houseRegex：去掉价格锚点（?:起拍价|当前价）
     QRegularExpression houseRegex(
         R"(<div\s+[^>]*?>[\s\S]*?)"
         R"(<span\s+class=["']text["']\s+numberoflines=["']2["'])"  // 稳定锚点1：标题span
@@ -425,12 +424,12 @@ void AliCrawl::extractHouseData(const QString& html)
         QString houseHtml = houseMatch.captured(0).trimmed();
         //状态获取
         QRegularExpression endFlagRegex(
-            R"(<div[^>]*?>[\s\S]*?结束[\s\S]*?<span\s+class=["']text["'][\s\S]*?</span>)",
+            R"(<div[^>]*?>[\s\S]*?已结束[\s\S]*?<span\s+class=["']text["'][\s\S]*?</span>)",
             QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption | QRegularExpression::MultilineOption
             );
         QRegularExpressionMatch endMatch = endFlagRegex.match(houseHtml);
         if (endMatch.hasMatch()) {
-            emit appendLogSignal("🚫 识别到“结束”标识，标记为无效房源，跳过处理");
+            emit appendLogSignal("🚫 识别到“已结束”标识，标记为无效房源，跳过处理");
             continue; // 跳过当前房源，处理下一个
         }
 
@@ -514,7 +513,7 @@ void AliCrawl::extractHouseData(const QString& html)
                 baseList[i] = baseList[i].trimmed();
             }
 
-            // ============== 优化1：优先按固定索引提取小区名（第一个元素） ==============
+            // 优先按固定索引提取小区名
             if (!baseList.isEmpty()) {
                 QString firstItem = baseList[0];
                 if (!firstItem.isEmpty()) {
@@ -524,9 +523,9 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // ============== 优化2：优先按固定索引提取面积（中间元素，排除第一个和最后两个） ==============
+            // 优先按固定索引提取面积
             int listSize = baseList.size();
-            // 中间元素范围：[1, listSize-3]（排除第一个和最后两个）
+
             for (int i = 1; i <= (listSize >= 3 ? listSize - 3 : listSize - 1); ++i) {
                 QString item = baseList[i];
                 if (isItemMatched[i] || item.isEmpty()) continue;
@@ -542,12 +541,17 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // ============== 优化3：优先按固定索引提取房型（中间元素，排除第一个和最后两个） ==============
-            QRegularExpression houseTypeRegex("^(\\d+|多)室(\\d+|多)厅(\\d+|多)卫?$", QRegularExpression::CaseInsensitiveOption);
+            // 优先按固定索引提取房型
+            QRegularExpression houseTypeRegex("^(?:(\\d+|多)室)?(?:(\\d+|多)厅)(?:(\\d+|多)卫)?$",
+                                              QRegularExpression::CaseInsensitiveOption);
+            // 遍历中间元素匹配户型
             for (int i = 1; i <= (listSize >= 3 ? listSize - 3 : listSize - 1); ++i) {
                 QString item = baseList[i];
-                if (isItemMatched[i] || item.isEmpty()) continue;
+                if (isItemMatched[i] || item.isEmpty()) {
+                    continue;
+                }
 
+                // 使用优化后的正则匹配户型
                 if (houseTypeRegex.match(item).hasMatch()) {
                     houseType = item;
                     emit appendLogSignal(QString("✅ 户型（中间元素匹配）：%1").arg(houseType));
@@ -556,7 +560,7 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // ============== 优化4：优先按固定索引提取区域信息（最后两个元素） ==============
+            // 优先按固定索引提取区域信息
             if (listSize >= 2) {
                 // 倒数第二个元素：优先作为城市
                 QString penultimateItem = baseList[listSize - 2];
@@ -574,8 +578,8 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // ============== 兜底逻辑：若固定索引提取失败，回退到原有逻辑 ==============
-            // 1. 小区名兜底（原有候选集逻辑，仅当索引提取失败时执行）
+
+            // 小区名兜底
             if (communityName == "未知" || communityName.isEmpty()) {
                 QList<QString> communityCandidates;
                 QRegularExpression hasChineseRegex("\\p{Script=Han}+", QRegularExpression::CaseInsensitiveOption);
@@ -602,7 +606,7 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // 2. 城市/区域兜底（原有纯中文正则逻辑，仅当索引提取失败时执行）
+            //  城市/区域兜底
             if (city == "未知" || region == "未知") {
                 QRegularExpression pureChineseRegex("^\\p{Script=Han}+$", QRegularExpression::CaseInsensitiveOption);
                 for (int i = 0; i < baseList.size(); ++i) {
@@ -623,9 +627,9 @@ void AliCrawl::extractHouseData(const QString& html)
                 }
             }
 
-            // 3. 面积/房型兜底（原有逻辑已包含，无需额外补充，未匹配到则保持未知）
 
-            // ============== 位置拼接（逻辑不变） ==============
+
+            // 位置拼接
             location = city != "未知" && region != "未知" ? QString("%1市%2区").arg(city, region) :
                            city != "未知" ? QString("%1市").arg(city) : "未知";
             if (location != "未知") {
@@ -758,7 +762,7 @@ void AliCrawl::extractHouseData(const QString& html)
     emit appendLogSignal("==================================================\n");
 }
 
-// ===================== 处理搜索URL（无需修改）=====================
+//  处理搜索URL
 void AliCrawl::processSearchUrl() {
     if (searchUrlQueue.isEmpty()) {
         if (currentPageCount >= targetPageCount) {
@@ -797,7 +801,7 @@ void AliCrawl::processSearchUrl() {
     webPage->load(request);
 }
 
-// ===================== 展示结果（无需修改）=====================
+//展示结果
 void AliCrawl::showHouseCompareResult() {
     emit appendLogSignal("\n" + QString("=").repeated(80));
     emit appendLogSignal("=== " + currentCity + "阿里二手房对比结果（共" + QString::number(houseDataList.size()) + "条）===");
@@ -869,7 +873,7 @@ void AliCrawl::showHouseCompareResult() {
                     validUnitPriceCount++;
                 }
             }
-           mysql->insertAlInfo(house); // 需启用时取消注释
+            //mysql->insertAlInfo(house); // 需启用时取消注释
 
         }
 
@@ -900,7 +904,7 @@ void AliCrawl::showHouseCompareResult() {
     emit appendLogSignal(QString("=").repeated(80));
 }
 
-// ===================== 核心修改：用QUrlQuery构建URL（彻底解决参数错乱）=====================
+//用QUrlQuery构建URL
 void AliCrawl::startHouseCrawl(const QString& cityWithDistrict, int targetPages) {
     // 拆分城市和区名（格式："北京-朝阳区" 或 "北京"）
     QStringList cityDistrict = cityWithDistrict.split("-", Qt::SkipEmptyParts);
@@ -936,16 +940,14 @@ void AliCrawl::startHouseCrawl(const QString& cityWithDistrict, int targetPages)
     QString pvid = generateRandomPvid();
     QString logId = generateLogId();
 
-    // ============== 关键修改：用QUrlQuery构建URL（彻底规避拼接冲突） ==============
+
     QUrl baseUrl("https://huodong.taobao.com/wow/pm/default/pc/4b05fb");
-    QUrlQuery query; // Qt官方推荐的URL参数构建类
+    QUrlQuery query;
 
-    // 1. 添加参数：逐个设置，无需手动处理%编码冲突，QUrlQuery自动兼容
-    // 关键词：二手房（直接传原始字符串，QUrlQuery可自动编码，也可手动编码，二选一）
     QString keywordRaw = "二手房";
-    query.addQueryItem("keyword", keywordRaw); // 自动编码（推荐），等价于手动编码的结果
+    query.addQueryItem("keyword", keywordRaw);
 
-    // 2. 其他参数：直接传原始格式（无需手动写%22，QUrlQuery会自动处理，也可传手动编码格式，均兼容）
+
     query.addQueryItem("fcatV4Ids", "[\"206058503\"]"); // 原始JSON格式，更易读
     query.addQueryItem("locationCodes", QString("[\"%1\"]").arg(locationCode));
     query.addQueryItem("page", QString::number(targetPageCount));
@@ -954,11 +956,11 @@ void AliCrawl::startHouseCrawl(const QString& cityWithDistrict, int targetPages)
     query.addQueryItem("h_n_purpose", "[\"1\"]");
     query.addQueryItem("structFieldMap", "{\"h_n_purpose\": [\"1\"]}");
 
-    // 3. 将参数设置到URL中
+
     baseUrl.setQuery(query);
     QString houseUrl = baseUrl.toString(); // 生成最终合法URL
 
-    // ============== 后续逻辑不变 ==============
+
     searchUrlQueue.enqueue(houseUrl);
     emit appendLogSignal("📌 待爬URL（阿里巴巴普通住宅页面）：" + houseUrl);
 

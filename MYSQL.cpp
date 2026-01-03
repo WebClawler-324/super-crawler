@@ -1,10 +1,9 @@
 #include"MYSQL.h"
 #include<QSqlQuery>
-#include<QList>
-#include<QVariant>
-#include<QDir>
-#include<QCoreApplication>
-
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>  // 若用到JSON文档解析，可一并包含
+#include <QJsonObject>
 Mysql::Mysql(){
     QString connName = QString("WebCrawl_%1").arg((quintptr)this); // 唯一连接名
     db = QSqlDatabase::addDatabase("QMYSQL", connName);
@@ -16,44 +15,22 @@ Mysql::~Mysql(){
 }
 
 void Mysql::connectDatabase(){
-    db.setHostName("localhost");
+    /*db.setHostName("localhost");
     db.setDatabaseName("HouseDB");
     db.setUserName("root");
     db.setPassword("qwqwasas25205817");
+    db.setPort(3306);*/
+    db.setHostName("rm-2zepql94a2hcect0vvo.mysql.rds.aliyuncs.com");
+    db.setDatabaseName("House_DB");
+    db.setUserName("action_2");
+    db.setPassword("123456");
     db.setPort(3306);
-
-    qDebug() << "=== MySQL Connection Debug Info ===";
-    qDebug() << "Qt可用数据库驱动：" << QSqlDatabase::drivers();
-    qDebug() << "QMYSQL driver available:" << QSqlDatabase::drivers().contains("QMYSQL");
-
-    // 检查插件路径
-    QString pluginPath = QCoreApplication::applicationDirPath() + "/../plugins/sqldrivers";
-    qDebug() << "Plugin path:" << pluginPath;
-    QDir pluginDir(pluginPath);
-    if (pluginDir.exists()) {
-        QStringList dllFiles = pluginDir.entryList(QStringList() << "*mysql*.dll", QDir::Files);
-        qDebug() << "MySQL DLL files found:" << dllFiles;
-    } else {
-        qDebug() << "Plugin directory does not exist!";
-    }
-
-    // 检查系统PATH中的MySQL库
-    QStringList pathDirs = QString(qgetenv("PATH")).split(";");
-    qDebug() << "Checking PATH for MySQL libraries...";
-    for (const QString& dir : pathDirs) {
-        if (dir.contains("mysql", Qt::CaseInsensitive)) {
-            qDebug() << "Found MySQL in PATH:" << dir;
-        }
-    }
-
+qDebug() << "Qt可用数据库驱动：" << QSqlDatabase::drivers();
     // 3. 打开连接并检查结果
     if (db.open()) {
         qDebug() << "MySQL连接成功！";
     } else {
         qDebug() << "MySQL连接失败：" << db.lastError().text();
-        qDebug() << "Error type:" << db.lastError().type();
-        qDebug() << "Database error:" << db.lastError().databaseText();
-        qDebug() << "Driver error:" << db.lastError().driverText();
     }
 }
 
@@ -75,47 +52,53 @@ void Mysql::insertInfo(const HouseData &data){
         qWarning() << "SQL准备失败：" << query.lastError().text();
     }
 
-    // 数据清理和转换
-    double priceValue = -1.0;
-    if(data.price != "未知" && !data.price.isEmpty()){
-        QString cleanPrice = data.price;
-        cleanPrice = cleanPrice.remove("万").remove(",").trimmed();
-        priceValue = cleanPrice.toDouble();
+    QString price = data.price;
+    if(price=="未知"){
+        price="-1";
+        price.toDouble();
+    }else{
+      price.remove("万").remove(",").trimmed().toDouble();
     }
 
-    double unitPriceValue = -1.0;
-    if(data.unitPrice != "未知" && !data.unitPrice.isEmpty()){
-        QString cleanUnitPrice = data.unitPrice;
-        cleanUnitPrice = cleanUnitPrice.remove("元/㎡").remove(",").trimmed();
-        unitPriceValue = cleanUnitPrice.toDouble();
+
+    QString unitPrice=data.unitPrice;
+    if(unitPrice=="未知"){
+        unitPrice="-1";
+        unitPrice.toDouble();
+    }else{
+       unitPrice.remove("元/㎡").remove(",").trimmed().toDouble();
     }
 
-    int yearValue = -1;
-    if(data.buildingYear != "未知" && !data.buildingYear.isEmpty()){
-        QString cleanYear = data.buildingYear;
-        cleanYear = cleanYear.remove("年").remove(",").trimmed();
-        yearValue = cleanYear.toInt();
+
+    QString year=data.buildingYear;
+    if(year=="未知"){
+        year="-1";
+        year.toDouble();
+    }else{
+        year.remove("年建造").remove(",").trimmed().toInt();
     }
 
-    double areaValue = -1.0;
-    if(data.area != "未知" && !data.area.isEmpty()){
-        QString cleanArea = data.area;
-        cleanArea = cleanArea.remove("㎡").remove(",").trimmed();
-        areaValue = cleanArea.toDouble();
+
+    QString area=data.area;
+    if(area=="未知"){
+        area="-1";
+        area.toDouble();
+    }else{
+        area.remove("㎡").remove(",").trimmed().toDouble();
     }
+    qDebug()<<"小区标题"<<data.houseTitle;
+    qDebug()<<"小区名"<<data.communityName;
     //绑定数据（参数名对应SQL中的:xxx）
     query.bindValue(":houseTitle", data.houseTitle);
     query.bindValue(":communityName", data.communityName);
-    query.bindValue(":price", priceValue);
-    query.bindValue(":unitPrice", unitPriceValue);
+    query.bindValue(":price",price);
+    query.bindValue(":unitPrice",unitPrice);
     query.bindValue(":houseType", data.houseType);
-    query.bindValue(":area", areaValue);
+    query.bindValue(":area",area);
     query.bindValue(":floor", data.floor);
     query.bindValue(":orientation", data.orientation);
-    query.bindValue(":buildingYear", yearValue);
+    query.bindValue(":buildingYear", year);
     query.bindValue(":houseUrl", data.houseUrl);
-
-    qDebug() << "插入数据：" << data.communityName << "价格:" << priceValue << "元";
 
     //执行插入
     if (!query.exec()) {
@@ -124,6 +107,304 @@ void Mysql::insertInfo(const HouseData &data){
        qDebug() << "数据插入成功！";
     }
 }
+
+
+void Mysql::insertAlInfo(const HouseInfo &data){
+    QString sql = R"(
+        INSERT INTO houseinfo (houseTitle,communityName, price, unitPrice,
+                            houseType, area, floor, orientation, buildingYear, houseUrl)
+        VALUES (:houseTitle,:communityName, :price, :unitPrice,
+                :houseType, :area, :floor, :orientation, :buildingYear, :houseUrl)
+    )";
+
+    //准备SQL查询
+    QSqlQuery query(db);  //显示绑定数据库
+    if (!query.prepare(sql)) {
+        qWarning() << "SQL准备失败：" << query.lastError().text();
+    }
+
+    QString price = data.price;
+    if(price=="未知"){
+        price="-1";
+        price.toDouble();
+    }else{
+        price.remove("万").remove(",").trimmed().toDouble();
+    }
+
+
+    QString unitPrice=data.unitPrice;
+    if(unitPrice=="计算失败"){
+        unitPrice="-1";
+        unitPrice.toDouble();
+    }else{
+        unitPrice.remove("元/㎡").remove(",").trimmed().toDouble();
+    }
+
+
+    QString year=data.buildingYear;
+    if(year=="未知"){
+        year="-1";
+        year.toDouble();
+    }else{
+        year.remove("年").remove(",").trimmed().toInt();
+    }
+
+
+    QString area=data.area;
+    if(area=="未知"){
+        area="-1";
+        area.toDouble();
+    }else{
+        area.remove("㎡").remove(",").trimmed().toDouble();
+    }
+    qDebug()<<"小区标题"<<data.houseTitle;
+    qDebug()<<"小区名"<<data.communityName;
+    //绑定数据（参数名对应SQL中的:xxx）
+    query.bindValue(":houseTitle", data.houseTitle);
+    query.bindValue(":communityName", data.communityName);
+    query.bindValue(":price",price);
+    query.bindValue(":unitPrice",unitPrice);
+    query.bindValue(":houseType", data.houseType);
+    query.bindValue(":area",area);
+    query.bindValue(":floor", data.floor);
+    query.bindValue(":orientation", data.orientation);
+    query.bindValue(":buildingYear", year);
+    query.bindValue(":houseUrl", data.houseUrl);
+
+    //执行插入
+    if (!query.exec()) {
+        qWarning() << "数据插入失败：" << query.lastError().text();
+    }else{
+        qDebug() << "数据插入成功！";
+    }
+}
+
+QVector<QVector<QString>> Mysql::getInfo(){
+    QVector<QVector<QString>> testSamples;
+
+    QSqlQuery query(db);  //显示绑定数据库
+    // SELECT 后面写全你需要的列名（和数据库中一致）
+    QString sql = R"(
+        SELECT communityName, price, unitPrice,
+               houseType, area, floor, orientation, buildingYear, houseUrl
+        FROM houseinfo;
+    )";
+    if (!query.exec(sql)) {
+        qDebug() << "查询失败：" << query.lastError().text();
+        db.close();
+        return testSamples;
+    }
+    // 3. 遍历结果集：逐行读取每列数据，转成QString并存入二维向量
+    while (query.next()) {  // 遍历每一行记录
+        QVector<QString> singleHouse;  // 存储单条房源的所有字段
+
+        // 逐个读取列数据
+        singleHouse.append(query.value("communityName").toString());
+
+        singleHouse.append(QString::number(query.value("price").toDouble()));
+
+        singleHouse.append(QString::number(query.value("unitPrice").toDouble()));
+
+        singleHouse.append(query.value("houseType").toString());
+
+        singleHouse.append(QString::number(query.value("area").toDouble()));
+
+        singleHouse.append(query.value("floor").toString());
+
+        singleHouse.append(query.value("orientation").toString());
+
+        if(query.value("buildingYear")==-1){
+            singleHouse.append("未知");
+        }else{
+            singleHouse.append(QString::number(query.value("buildingYear").toInt()));
+        }
+
+        singleHouse.append(query.value("houseUrl").toString());
+
+        testSamples.append(singleHouse);
+    }
+
+    return testSamples;
+}
+
+void  Mysql::getPriceCout(double& two, double & four, double & ufour)
+{
+    two = 0.0;
+    four = 0.0;
+    ufour = 0.0;
+
+
+    if (!db.isOpen()) {
+        qDebug() << "数据库未打开，查询失败！";
+        return;
+    }
+
+    QSqlQuery query(db);
+
+    QString sql = R"(
+        SELECT price
+        FROM houseinfo
+    )";
+
+    // 执行SQL查询
+    if (!query.exec(sql)) {
+        qDebug() << "查询失败：" << query.lastError().text();
+        return;
+    }
+
+    double count2=0, count4=0, count5=0, total=0;
+
+    while (query.next()) {
+        // 优免重复调用toDouble()，提高效率
+        double price = query.value("price").toDouble();
+        total++;
+
+        if (price <= 200) {
+            count2++;
+        } else if (price > 200 && price <= 400) {
+            count4++;
+        } else if (price > 400) {
+            count5++;
+        }
+    }
+
+    if (total == 0) {
+        qDebug() << "数据库表houseinfo中无数据，无需计算百分比！";
+        return;
+    }
+    two = (count2 / total) * 100.0;
+    four = (count4 / total) * 100.0;
+    ufour = (count5 / total) * 100.0;
+}
+
+
+void Mysql::getAreaCout(double& One,double & Two,double & Three, double & total)
+{
+    One=0.0;
+    Two=0.0;
+    Three=0.0;
+    total=0.0;
+
+    if (!db.isOpen()) {
+        qDebug() << "数据库未打开，查询失败！";
+        return;
+    }
+
+    QSqlQuery query(db);
+
+    QString sql = R"(
+        SELECT area
+        FROM houseinfo
+    )";
+
+    // 执行SQL查询
+    if (!query.exec(sql)) {
+        qDebug() << "查询失败：" << query.lastError().text();
+        return;
+    }
+
+    double count1=0, count2=0, count3=0;
+
+    while (query.next()) {
+        // 优免重复调用toDouble()，提高效率
+        double price = query.value("area").toDouble();
+        total++;
+
+        if (price <= 100) {
+            count1++;
+        } else if (price >100 && price <=200) {
+            count2++;
+        } else if (price >200) {
+            count3++;
+        }
+    }
+
+    if (total == 0) {
+        qDebug() << "数据库表houseinfo中无数据";
+        return;
+    }
+
+    One=count1;
+    Two=count2;
+    Three=count3;
+    qDebug()<<One;
+    qDebug()<<Two;
+    qDebug()<<Three;
+
+}
+
+void Mysql::generateTable(QTableWidget* tableWidget,QList<QStringList> &tableOriginalData){
+    if (!db.isOpen()) {
+        qDebug() << "数据库未打开，查询失败！";
+        return;
+    }
+
+    QSqlQuery query(db);
+
+    QString sql = R"(
+        SELECT houseTitle,communityName,price,unitPrice,area,houseType,floor,houseUrl
+        FROM houseinfo
+    )";
+    // 执行SQL查询
+    if (!query.exec(sql)) {
+        qDebug() << "查询失败：" << query.lastError().text();
+        return;
+    }
+
+    int dataRowCount = 0;
+    // 先遍历一次统计行数
+    while (query.next())
+    {
+        dataRowCount++;
+    }
+    //将查询指针重置到结果集开头，以便重新遍历填充数据
+    query.first();
+    query.previous();
+
+    qDebug() << "查询到的数据总行数：" << dataRowCount; // 验证是否有数据（核心排查）
+
+    //初始化表格
+    tableWidget->setColumnCount(8); // 你要填充8列（0~7），必须先设置列数
+    tableWidget->clearContents();   // 清空原有单元格数据（保留表格结构）
+    tableOriginalData.clear();
+    tableWidget->setRowCount(dataRowCount); // 设置表格行数与数据行数一致
+
+     int currentRow = 0;
+    while(query.next()){
+         QStringList rowData; // 每次循环新建一个，存储当前行的独立数据
+
+         // 步骤3：按列顺序，填充QStringList（与表格填充顺序完全一致）
+         QString col0 = query.value(0).toString().trimmed(); // houseTitle
+         QString col1 = query.value(1).toString().trimmed(); // communityName
+         QString col2 = query.value(2).toString().trimmed()+"万"; // price
+         QString col3 = query.value(3).toString().trimmed()+"元"; // unitPrice
+         QString col4 = query.value(4).toString().trimmed()+"平米"; // area
+         QString col5 = query.value(5).toString().trimmed(); // houseType
+         QString col6 = query.value(6).toString().trimmed(); // floor
+         QString col7 = query.value(7).toString().trimmed(); // houseUrl
+
+         // 向rowData中添加8列数据（顺序与表格一致，后续可通过索引精准获取）
+         rowData << col0 << col1 << col2 << col3 << col4 << col5 << col6 << col7;
+
+        // 填充其他列（索引1~6）
+        tableWidget->setItem(currentRow, 0, new QTableWidgetItem(query.value(0).toString()));
+        tableWidget->setItem(currentRow, 1, new QTableWidgetItem(query.value(1).toString()));
+        tableWidget->setItem(currentRow, 2, new QTableWidgetItem(query.value(2).toString()+"万"));
+        tableWidget->setItem(currentRow, 3, new QTableWidgetItem(query.value(3).toString()+"元"));
+        tableWidget->setItem(currentRow, 4, new QTableWidgetItem(query.value(4).toString()+"平米"));
+        tableWidget->setItem(currentRow, 5, new QTableWidgetItem(query.value(5).toString()));
+        tableWidget->setItem(currentRow, 6, new QTableWidgetItem(query.value(6).toString()));
+        tableWidget->setItem(currentRow,7, new QTableWidgetItem(query.value(7).toString()));
+
+        currentRow++;
+
+         // 保存到原始数据容器
+         tableOriginalData.append(rowData);
+    }
+
+
+}
+
 
 QList<HouseData> Mysql::getAllHouseData()
 {
@@ -315,5 +596,32 @@ HouseData Mysql::createHouseDataFromQuery(QSqlQuery& query)
 }
 
 
+//批量转为Jason
+void Mysql::getToJas(QJsonArray& houseDataArray){
+
+    QString sql = "SELECT houseTitle, communityName, price, unitPrice, houseType, "
+                  "area, floor, orientation, buildingYear, houseUrl FROM houseinfo";
+
+    QSqlQuery query(db);
+    if (!query.exec(sql)) {
+        qWarning() << "查询房源数据失败：" << query.lastError().text();
+    }
+    houseDataArray = QJsonArray();
+    while (query.next()) {
+
+        QString price= QString::number(query.value(2).toDouble());
+        QJsonObject q1;
+        q1["房子标题"]=query.value(0).toString();
+        q1["小区名"]=query.value(1).toString();
+        q1["总价"] = price+"万";
+        q1["面积"]=query.value(5).toString()+"平米";
+        q1["户型"] = query.value(4).toString();
+        q1["单价"] = query.value(3).toString()+"元/㎡";
+        q1["楼层"] = query.value(6).toString();
+        q1["朝向"] = query.value(7).toString();
+        q1["年代"] = query.value(8).toString();
+        houseDataArray.append(q1);
+    }
+}
 
 

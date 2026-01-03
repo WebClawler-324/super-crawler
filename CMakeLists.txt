@@ -9,18 +9,20 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 1. 统一查找Qt模块（兼容Qt5/Qt6，包含WebEngineWidgets）
+# 1. 统一查找Qt模块（兼容Qt5/Qt6，【修改1：添加Charts组件】）
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS
     Widgets
     Network
     WebEngineWidgets  # 爬虫核心依赖：WebEngine
     Sql
+    Charts  # 新增：Qt Charts模块（图表可视化核心）
 )
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Widgets
     Network
     WebEngineWidgets
     Sql
+    Charts  # 新增：对应Qt版本的Charts组件（必须同步添加）
 )
 
 # 2. 配置Gumbo源码（路径校验+防遗漏）
@@ -64,32 +66,41 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         ${GUMBO_SOURCES}
-        Crawl.h
-        Crawl.cpp
+        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/ke_cookies.txt
+        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/h5st_encrypt.js
+
+
+
         HouseData.h
-        DeepSeekClient.h
-        DeepSeekClient.cpp
+        LLMClient.h
+        LLMClient.cpp
         MYSQL.h
         MYSQL.cpp
-        TaxCalculator.h
-        TaxCalculator.cpp
-        AIDataInterface.h
-        AIDataInterface.cpp
-        AliCrawl.h
-        AliCrawl.cpp
+
+
         HouseInfo.h
         CrawlThreadManager.h
 
+        ali_cookies.txt
+        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/ali_cookies.txt
+        GreaterModel/house_intent_config.txt GreaterModel/house_intent_model.cpp GreaterModel/house_intent_model.h GreaterModel/preprocessor.cpp GreaterModel/preprocessor.h
+        GreaterModel/house_intent_config.txt GreaterModel/house_intent_model.cpp GreaterModel/house_intent_model.h GreaterModel/preprocessor.cpp GreaterModel/preprocessor.h
+        GreaterModel/house_intent_model.cpp GreaterModel/house_intent_model.h GreaterModel/preprocessor.cpp GreaterModel/preprocessor.h
+
+        AliCrawl.h
+        Crawl.h
+        AliCrawler.cpp
+        Crawl.cpp
+        CustomInfoDialog.h
+        CustomInfoDialog.cpp
+        web/map.html
+        AIh/AIDataInterface.h AIh/AIDialogueClient.h AIh/DeepSeekClient.h
+        AIc/AIDataInterface.cpp AIc/AIDialogueClient.cpp AIc/DeepSeekClient.cpp
 
 
 
 
-
-        house_intent_config.txt
-        house_intent_model.cpp
-        house_intent_model.h
-        preprocessor.cpp
-        preprocessor.h
+        # Gumbo源码必须加入编译
     )
 else()
     if(ANDROID)
@@ -105,17 +116,19 @@ else()
     endif()
 endif()
 
-# 6. 链接Qt库（统一兼容Qt5/Qt6，避免重复链接）
+# 6. 链接Qt库（统一兼容Qt5/Qt6，【修改2：添加Charts链接】）
 target_link_libraries(WebCrawler PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
     Qt${QT_VERSION_MAJOR}::WebEngineWidgets  # 关键：链接WebEngine
     Qt${QT_VERSION_MAJOR}::Sql
-)
-target_include_directories(WebCrawler PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen
+    Qt${QT_VERSION_MAJOR}::Charts  # 新增：链接Qt Charts库
 )
 
+target_include_directories(WebCrawler PRIVATE
+    # 直接写死绝对路径，无任何相对路径
+    C:/Users/21495/QTProgram/WebCrawler/third_party/eigen
+)
 # 7. 目标属性配置（精简+兼容）
 if(${QT_VERSION} VERSION_LESS 6.1.0)
   set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.WebCrawler)

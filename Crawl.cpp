@@ -18,7 +18,6 @@
 #include <QTextStream>
 #include<QChar>
 
-
 // 类内静态常量初始化
 const int Crawl::REQUEST_INTERVAL = 3000;
 const int Crawl::MAX_DEPTH = 1;
@@ -36,47 +35,82 @@ QString currentCity;
 bool isHomeLoadedForSearch = false;
 QString pendingSearchKeyword;
 
-// ===================== 城市名转拼音（修正：用 m_ui + 信号）=====================
-QString Crawl::cityToPinyin(const QString& cityName) { // 去掉 ui 参数，用成员变量 m_ui
+//嵌套映射：城市→区→对应拼音
+QMap<QString, QMap<QString, QString>> Crawl::getRegionCodeMap() {
+    QMap<QString, QMap<QString, QString>> regionPinyinMap;
+
+    // 1. 北京（区域拼音，适配安居客URL规则）
+    QMap<QString, QString> beijingRegions;
+    beijingRegions["东城区"] = "dongcheng";
+    beijingRegions["西城区"] = "xicheng";
+    beijingRegions["朝阳区"] = "chaoyang";
+    beijingRegions["海淀区"] = "haidian";
+    beijingRegions["丰台区"] = "fengtai";
+    beijingRegions["石景山区"] = "shijingshan";
+    beijingRegions["通州区"] = "tongzhou";
+    beijingRegions["昌平区"] = "changping";
+    regionPinyinMap["北京"] = beijingRegions;
+
+    // 2. 上海（区域拼音）
+    QMap<QString, QString> shanghaiRegions;
+    shanghaiRegions["浦东新区"] = "pudongxin";
+    shanghaiRegions["黄浦区"] = "huangpu";
+    shanghaiRegions["静安区"] = "jingan";
+    shanghaiRegions["徐汇区"] = "xuhui";
+    shanghaiRegions["闵行区"] = "minhang";
+    shanghaiRegions["杨浦区"] = "yangpu";
+    regionPinyinMap["上海"] = shanghaiRegions;
+
+    // 3. 广州（区域拼音）
+    QMap<QString, QString> guangzhouRegions;
+    guangzhouRegions["天河区"] = "tianhe";
+    guangzhouRegions["越秀区"] = "yuexiu";
+    guangzhouRegions["海珠区"] = "haizhu";
+    guangzhouRegions["番禺区"] = "panyu";
+    guangzhouRegions["白云区"] = "baiyun";
+    regionPinyinMap["广州"] = guangzhouRegions;
+
+    // 4. 杭州（区域拼音）
+    QMap<QString, QString> hangzhouRegions;
+    hangzhouRegions["西湖区"] = "xihu";
+    hangzhouRegions["滨江区"] = "binjiang";
+    hangzhouRegions["余杭区"] = "yuhang";
+    hangzhouRegions["萧山区"] = "xiaoshan";
+    hangzhouRegions["拱墅区"] = "gongshu";
+    regionPinyinMap["杭州"] = hangzhouRegions;
+
+    return regionPinyinMap;
+}
+
+// ===================== 城市/区县转拼音（适配安居客）=====================
+QString Crawl::regionToCode(const QString& cityName, const QString& districtName) {
+    QMap<QString, QMap<QString, QString>> regionPinyinMap = getRegionCodeMap();
+
+    // 优先返回区域拼音
+    if (!districtName.isEmpty()) {
+        if (regionPinyinMap.contains(cityName) && regionPinyinMap[cityName].contains(districtName)) {
+            return regionPinyinMap[cityName][districtName];
+        }
+        emit appendLogSignal(QString("⚠️ 未支持「%1-%2」的区域拼音，请手动添加到getRegionCodeMap！").arg(cityName, districtName));
+        return "";
+    }
+
+    //返回安居客城市拼音
     QMap<QString, QString> cityPinyinMap = {
-        {"北京", "bj"}, {"上海", "sh"}, {"广州", "gz"}, {"深圳", "sz"}, {"杭州", "hz"},
-        {"南京", "nj"}, {"成都", "cd"}, {"重庆", "cq"}, {"武汉", "wh"}, {"西安", "xa"},
-        {"天津", "tj"}, {"苏州", "sz"}
+        {"北京", "bj"}, {"上海", "sh"}, {"广州", "gz"},
+        {"深圳", "sz"}, {"杭州", "hz"}, {"南京", "nj"},
+        {"成都", "cd"}, {"重庆", "cq"}, {"武汉", "wh"},
+        {"西安", "xa"}, {"天津", "tj"}, {"苏州", "sz"}
     };
     if (cityPinyinMap.contains(cityName)) {
         return cityPinyinMap[cityName];
     }
 
-    QString pinyin;
-    QStringEncoder encoder("GBK");
-
-    if (!encoder.isValid()) {
-        // 发送信号，由主线程更新 UI（避免跨线程）
-        emit appendLogSignal("⚠️ 拼音转换失败：系统不支持 GBK 编码，返回城市名小写");
-        return cityName.toLower();
-    }
-
-    for (QChar c : cityName) {
-        if (c.unicode() >= 0x4E00 && c.unicode() <= 0x9FA5) {
-            QByteArray gbkBytes = encoder.encode(QString(c));
-            if (gbkBytes.size() == 2) {
-                uchar highByte = gbkBytes.at(0);
-                uchar lowByte = gbkBytes.at(1);
-                if (highByte >= 0xB0 && highByte <= 0xF7 && lowByte >= 0xA1 && lowByte <= 0xFE) {
-                    int 区位码 = (highByte - 0xB0) * 94 + (lowByte - 0xA1);
-                    QString firstLetter = getFirstLetter(区位码);
-                    pinyin += firstLetter.toLower();
-                }
-            }
-        } else {
-            pinyin += c.toLower();
-        }
-    }
-
-    return pinyin.isEmpty() ? cityName.toLower() : pinyin;
+    emit appendLogSignal(QString("⚠️ 未支持「%1」的城市拼音，请手动添加到cityPinyinMap！").arg(cityName));
+    return "";
 }
 
-// ===================== 辅助函数：根据区位码获取首字母（不变）=====================
+//根据区位码获取首字母
 QString Crawl::getFirstLetter(int index) {
     const QStringList letters = {"A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N",
                                  "O", "P", "Q", "R", "S", "T", "W", "X", "Y", "Z"};
@@ -91,8 +125,8 @@ QString Crawl::getFirstLetter(int index) {
     return "A";
 }
 
-// ===================== 模拟真人行为（修正：用 m_mainWindow + 信号）=====================
-void Crawl::simulateHumanBehavior() { // 去掉 ui 参数
+// 模拟真人行为
+void Crawl::simulateHumanBehavior() {
     QStringList jsScrolls = {
         QString("window.scrollTo(0, %1);").arg(QRandomGenerator::global()->bounded(400, 600)),
         QString("window.scrollTo(0, %1);").arg(QRandomGenerator::global()->bounded(1000, 1500)),
@@ -113,22 +147,20 @@ void Crawl::simulateHumanBehavior() { // 去掉 ui 参数
     emit appendLogSignal("🤖 模拟真人浏览：总停留" + QString::number(totalStayTime/1000) + "秒");
 }
 
-// Cookie管理函数
+// Cookie管理函数（保留ke_cookies.txt文件名不变）
 void Crawl::loadCookiesFromFile(const QString& filePath) {
     QFile file(filePath.isEmpty() ? "ke_cookies.txt" : filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         emit appendLogSignal(QString("⚠️ Cookie文件加载失败：%1（将使用默认Cookie）").arg(file.fileName()));
-        cookieStr = "s_ViewType=1; select_city=110000; city=beijing; lianjia_uuid=7477f2d0-8c9c-4e0d-b746-7a9f8499c9c8; "
-                    "UM_distinctid=18c4f5e0d8d4b-0a63850565d14f-26031d51-144000-18c4f5e0d8e38a; "
-                    "CNZZDATA1252603592=1732567464-1690000000-%7C1690000000; _smt_uid=64c7e0d8.5f3e1b92; "
-                    "Hm_lvt_9152f8221cb6243a53c83b95a46c988=1690000000; Hm_lpvt_9152f8221cb6243a53c83b95a46c988=1690000000";
+        // 安居客默认Cookie（可忽略，主要依赖用户手动配置）
+        cookieStr = "anjuke_uuid=7477f2d0-8c9c-4e0d-b746-7a9f8499c9c8; s_ViewType=1; select_city=110000; city=beijing;";
         return;
     }
 
     QTextStream in(&file);
     cookieStr = in.readAll().trimmed();
     file.close();
-    emit appendLogSignal(QString("✅ 成功加载Cookie：%1").arg(cookieStr.isEmpty() ? "无" : "已加载（来自文件）"));
+    emit appendLogSignal(QString("✅ 成功加载Cookie：%1").arg(cookieStr.isEmpty() ? "无" : "已加载（来自ke_cookies.txt）"));
 }
 
 void Crawl::saveCookiesToFile(const QString& filePath) {
@@ -145,7 +177,7 @@ void Crawl::saveCookiesToFile(const QString& filePath) {
     emit appendLogSignal(QString("✅ Cookie已保存到：%1").arg(savePath));
 }
 
-// 工具函数
+// 工具函数（不变）
 QString Crawl::generateRandomPvid() {
     const QString chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     QString pvid;
@@ -171,12 +203,11 @@ int Crawl::getRandomInterval() {
     return QRandomGenerator::global()->bounded(MIN_REQUEST_INTERVAL, MAX_REQUEST_INTERVAL);
 }
 
-
 Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindow* ui)
     : QObject(nullptr)
     , webPage(nullptr)
-    , m_ui(ui)          // 初始化：存储 UI 指针（借用，不管理生命周期）
-    , m_mainWindow(mainWindow) // 初始化：存储窗口实例（稳定接收者）
+    , m_ui(ui)
+    , m_mainWindow(mainWindow)
     , isProcessingSearchTask(false)
     , currentPageCount(0)
     , targetPageCount(1)
@@ -189,11 +220,11 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     // webPage 初始化
     if (webPageParam != nullptr) {
         webPage = webPageParam;
-        webPage->setParent(this); // 让 Crawl 管理 webPage 生命周期
+        webPage->setParent(this);
     } else {
         webPage = new QWebEnginePage(this);
     }
-       connect(this, &Crawl::startCrawlSignal, this, &Crawl::startHouseCrawl, Qt::QueuedConnection);
+    connect(this, &Crawl::startCrawlSignal, this, &Crawl::startHouseCrawl, Qt::QueuedConnection);
 
     // WebEngine配置
     QWebEngineSettings* settings =webPage->settings();
@@ -207,13 +238,13 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
     // 连接页面加载完成信号
     connect(webPage, &QWebEnginePage::loadFinished, this, &Crawl::onPageLoadFinished);
 
-    // 加载 Cookie
+    // 加载 Cookie（保留ke_cookies.txt）
     loadCookiesFromFile();
 
     int delayMs = 1000 + QRandomGenerator::global()->bounded(2000);
     QTimer::singleShot(
         delayMs,
-        this,  // 接收者改为 this，匹配槽函数所属类
+        this,
         SLOT(onInitFinishedLog())
         );
 }
@@ -221,7 +252,7 @@ Crawl::Crawl(MainWindow *mainWindow, QWebEnginePage *webPageParam, Ui::MainWindo
 Crawl::~Crawl() {
     // 清理 Web
     if (webPage != nullptr) {
-        webPage->deleteLater(); // 延迟销毁，避免阻塞事件循环
+        webPage->deleteLater();
         webPage = nullptr;
     }
 
@@ -238,16 +269,15 @@ Crawl::~Crawl() {
     emit appendLogSignal("🔌 Crawl 实例已安全销毁，资源释放完成");
 }
 
-
 void Crawl::onInitFinishedLog() {
-    emit appendLogSignal("✅ 浏览器环境初始化完成，可开始爬取贝壳找房（低风控模式）");
+    emit appendLogSignal("✅ 浏览器环境初始化完成，可开始爬取安居客（低风控模式）");
     emit appendLogSignal("💡 使用说明：在输入框输入城市名（如：北京、上海），点击搜索对比按钮");
 }
 
-//处理普通URL
+//处理普通URL（适配安居客首页）
 void Crawl::processNextUrl() {
     if (urlQueue.isEmpty()) {
-        emit appendLogSignal("\n=== 贝壳找房首页爬取完成 ===");
+        emit appendLogSignal("\n=== 安居客首页爬取完成 ===");
         return;
     }
 
@@ -259,21 +289,19 @@ void Crawl::processNextUrl() {
 
     QString randomUA = getRandomUA();
     request.setHeader(QByteArray("User-Agent"), randomUA.toUtf8());
-    request.setHeader(QByteArray("Referer"), QByteArray("https://www.ke.com/"));
+    request.setHeader(QByteArray("Referer"), QByteArray("https://www.anjuke.com/"));
     request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
-    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
+    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br"));
     request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8"));
     request.setHeader(QByteArray("Cache-Control"), QByteArray("no-cache"));
     request.setHeader(QByteArray("Connection"), QByteArray("keep-alive"));
-    // 移除 DNT:1（冗余，普通用户不携带）
     request.setHeader(QByteArray("Pragma"), QByteArray("no-cache"));
-    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\"")); // 更新版本
+    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\""));
     request.setHeader(QByteArray("Sec-Ch-Ua-Mobile"), QByteArray("?0"));
     request.setHeader(QByteArray("Sec-Ch-Ua-Platform"), QByteArray("\"Windows\""));
     request.setHeader(QByteArray("Sec-Fetch-Dest"), QByteArray("document"));
     request.setHeader(QByteArray("Sec-Fetch-Mode"), QByteArray("navigate"));
     request.setHeader(QByteArray("Sec-Fetch-Site"), QByteArray("same-origin"));
-    // 移除 Sec-Fetch-User:?1（冗余，脚本特征）
     request.setHeader(QByteArray("Upgrade-Insecure-Requests"), QByteArray("1"));
 
     if (!cookieStr.isEmpty()) {
@@ -285,22 +313,22 @@ void Crawl::processNextUrl() {
     webPage->load(request);
 }
 
-//页面加载完成槽函数
+//页面加载完成槽函数（适配安居客风控检测）
 void Crawl::onPageLoadFinished(bool ok) {
     if (this == nullptr || webPage == nullptr) return;
 
     QString currentUrl = webPage->url().toString();
     bool isSearchTask = isProcessingSearchTask;
 
-    // 处理首页加载完成后的搜索任务
-    if (isHomeLoadedForSearch && currentUrl.contains("ke.com") && !currentUrl.contains("ershoufang")) {
-        emit appendLogSignal("✅ 贝壳首页加载完成，延迟4-6秒后开始爬取二手房...");
+    // 处理首页加载完成后的搜索任务（安居客首页）
+    if (isHomeLoadedForSearch && currentUrl.contains("anjuke.com") && !currentUrl.contains("sale")) {
+        emit appendLogSignal("✅ 安居客首页加载完成，延迟4-6秒后开始爬取二手房...");
         int homeDelay = 4000 + QRandomGenerator::global()->bounded(2000);
 
         QTimer::singleShot(
             homeDelay,
             this,
-            [this]() { // Lambda 发送信号，不直接操作 UI
+            [this]() {
                 emit appendLogSignal("🔍 开始执行二手房爬取任务...");
                 processSearchUrl();
             }
@@ -311,17 +339,18 @@ void Crawl::onPageLoadFinished(bool ok) {
         return;
     }
 
-    // 风控检测
+    // 安居客风控检测（验证页关键词适配）
     bool isRiskPage = currentUrl.contains("verify", Qt::CaseInsensitive) ||
                       currentUrl.contains("captcha", Qt::CaseInsensitive) ||
                       currentUrl.contains("security", Qt::CaseInsensitive) ||
-                      currentUrl.contains("antispam", Qt::CaseInsensitive);
+                      currentUrl.contains("antispam", Qt::CaseInsensitive) ||
+                      currentUrl.contains("safe", Qt::CaseInsensitive);
     if (isRiskPage) {
-        emit appendLogSignal("❌ 触发贝壳风控！跳转至验证页：" + currentUrl);
+        emit appendLogSignal("❌ 触发安居客风控！跳转至验证页：" + currentUrl);
         emit appendLogSignal("💡 解决方案：");
-        emit appendLogSignal("  1. 关闭VPN/代理，确保IP与登录Cookie一致；");
+        emit appendLogSignal("  1. 关闭VPN/代理，使用本地IP；");
         emit appendLogSignal("  2. 降低爬取频率，单次仅爬1页；");
-        emit appendLogSignal("  3. 重新获取最新Cookie并更新ke_cookies.txt。");
+        emit appendLogSignal("  3. 重新获取安居客Cookie并更新ke_cookies.txt。");
         searchUrlQueue.clear();
         isProcessingSearchTask = false;
         return;
@@ -341,13 +370,13 @@ void Crawl::onPageLoadFinished(bool ok) {
 
     // 加载成功 模拟真人行为
     emit appendLogSignal("✅ 页面加载成功：" + currentUrl);
-    simulateHumanBehavior(); // 无需传参，用成员变量
+    simulateHumanBehavior();
 
     // 渲染延迟
-    int renderDelay = currentUrl.contains("ershoufang")
+    int renderDelay = currentUrl.contains("sale")
                           ? 15000 + QRandomGenerator::global()->bounded(5000)
                           : 4000 + QRandomGenerator::global()->bounded(3000);
-    if (currentUrl.contains("ershoufang")) {
+    if (currentUrl.contains("sale")) {
         emit appendLogSignal("⏳ 房源页等待完全渲染（" + QString::number(renderDelay/1000) + "秒）...");
     }
 
@@ -356,18 +385,16 @@ void Crawl::onPageLoadFinished(bool ok) {
         if (this == nullptr || webPage == nullptr) return;
 
         webPage->toHtml([this, currentUrl, isSearchTask](const QString& html) {
-            // 调试日志：发送信号（避免子线程操作 UI）
-            bool hasHouseNode = html.contains("li class=\"clear\"");
-            emit appendLogSignal(QString("📋 获取到HTML：%1房源节点（li.clear）").arg(hasHouseNode ? "包含" : "不包含"));
+            bool hasHouseNode = html.contains("div class=\"house-item\"") || html.contains("li class=\"house-list-item\"");
+            emit appendLogSignal(QString("📋 获取到HTML：%1房源节点").arg(hasHouseNode ? "包含" : "不包含"));
 
-            // 提取房源数据（搜索任务 + 二手房页面）
-            if (isSearchTask && currentUrl.contains("ershoufang")) {
+            // 提取安居客房源数据
+            if (isSearchTask && currentUrl.contains("sale")) {
                 extractHouseData(html);
                 currentPageCount++;
 
                 // 处理下一页或结束
                 QString nextLog;
-                //爬完当前页就结束，不加载下一页
                 isProcessingSearchTask = false;
                 nextLog = QString("✅ 第%1页爬取完成，无下一页（一次只爬1页），准备显示结果...").arg(targetPageCount);
                 QTimer::singleShot(1000, this, &Crawl::showHouseCompareResult);
@@ -381,12 +408,12 @@ void Crawl::onPageLoadFinished(bool ok) {
     });
 }
 
-//解析普通页面
+//解析普通页面（适配安居客）
 void Crawl::extractKeData(const QString& html, const QString& baseUrl)
 {
-   emit appendLogSignal("🔍 开始解析贝壳页面...");
+    emit appendLogSignal("🔍 开始解析安居客页面...");
 
-    QRegularExpression cityRegex(R"(<a\s+href=["'](https?://[^.]+.ke.com/)["']\s+class=["']city-item["'].*?>([\s\S]*?)</a>)",
+    QRegularExpression cityRegex(R"(<a\s+href=["'](https?://[^.]+.anjuke.com/)["']\s+class=["']city-item["'].*?>([\s\S]*?)</a>)",
                                  QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator cityIt = cityRegex.globalMatch(html);
     while (cityIt.hasNext()) {
@@ -399,7 +426,7 @@ void Crawl::extractKeData(const QString& html, const QString& baseUrl)
             crawledUrls.insert(cityUrl);
             urlQueue.enqueue(cityUrl);
             urlDepth[cityUrl] = urlDepth[baseUrl] + 1;
-           emit appendLogSignal("🏙️  城市：" + cityName + " | 链接：" + cityUrl);
+            emit appendLogSignal("🏙️  城市：" + cityName + " | 链接：" + cityUrl);
         }
     }
 
@@ -407,220 +434,313 @@ void Crawl::extractKeData(const QString& html, const QString& baseUrl)
     emit appendLogSignal("————————————————");
 }
 
-
+// 提取安居客房源数据（核心修改：适配安居客页面结构）
 void Crawl::extractHouseData(const QString& html)
 {
-    emit appendLogSignal("🔍 开始提取二手房房源数据...");
+    emit appendLogSignal("🔍 开始提取安居客二手房房源数据...");
 
-    // 1. 匹配单个房源容器：<li class="clear">
+    // ========== 修正后的外层房源正则：捕获完整标签，优化标志 ==========
     QRegularExpression houseRegex(
-        R"(<li\s+class=["']clear["'].*?>([\s\S]*?)</li>)",
+        R"(<div[^>]*?class=["']\s*property\s*["'][^>]*>([\s\S]*?)(?=<div[^>]*?class=["']\s*property\s*["']|$))",
         QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
         );
-
     QRegularExpressionMatchIterator houseIt = houseRegex.globalMatch(html);
     int extractCount = 0;
 
     while (houseIt.hasNext()) {
         QRegularExpressionMatch houseMatch = houseIt.next();
-        QString houseHtml = houseMatch.captured(1).trimmed();
+        QString houseHtml = houseMatch.captured(0).trimmed();
 
+        // 调试日志（保留）
+        bool hasH3CoreClass = houseHtml.contains("property-content-title-name");
+        bool hasPriceClass = houseHtml.contains("property-price-total-num");
+        bool hasCommunityClass = houseHtml.contains("property-content-info-comm-name");
+        bool hasHouseTypeClass = houseHtml.contains("property-content-info-attribute");
+        emit appendLogSignal(QString("\n🔍 房源片段调试：长度=%1 | 包含h3核心class=%2 | 包含总价class=%3 | 包含小区名class=%4 | 包含户型class=%5")
+                                 .arg(houseHtml.length())
+                                 .arg(hasH3CoreClass ? "是" : "否")
+                                 .arg(hasPriceClass ? "是" : "否")
+                                 .arg(hasCommunityClass ? "是" : "否")
+                                 .arg(hasHouseTypeClass ? "是" : "否"));
 
-        // ========== 初始化字段 ==========
+        // 跳过空片段 + 无效片段（无核心标题class，或缺少关键字段class）
+        if (houseHtml.isEmpty() || !hasH3CoreClass) {
+            continue;
+        }
+        // ========== 初始化字段（关键修改1：将面积、朝向等初始化为空字符串，而非“未知”） ==========
         QString title = "未知";
         QString communityName = "未知";
         QString totalPrice = "未知";
         QString unitPrice = "未知";
         QString houseType = "未知";
-        QString area = "未知";
-        QString orientation = "未知";
-        QString floor = "未知";
-        QString buildingYear = "未知";
+        QString area = ""; // 初始化为空，确保 isEmpty() 返回 true
+        QString orientation = ""; // 初始化为空，确保 isEmpty() 返回 true
+        QString floor = ""; // 初始化为空，确保 isEmpty() 返回 true
+        QString buildingYear = ""; // 初始化为空，确保 isEmpty() 返回 true
         QString houseUrl = "未知";
 
-
-        //  提取房源标题
-        QRegularExpression titleRegex(R"(<a\s+.*?title=["']([^"']+)["'].*?>)", QRegularExpression::DotMatchesEverythingOption);
-        if (titleRegex.match(houseHtml).hasMatch()) {
-            title = titleRegex.match(houseHtml).captured(1).trimmed();
-        }
-       emit appendLogSignal(QString("\n📌 房源标题：%1").arg(title));
-
-
-       //  2. 小区名提取（放弃多余判断，直接抓 a 标签文本）
-       // 匹配 positionInfo 容器 + 预处理（移除span干扰）
-       QRegularExpression posInfoRegex(R"(<div\s+class=["']positionInfo["']([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
-       QRegularExpressionMatch posInfoMatch = posInfoRegex.match(houseHtml);
-       if (!posInfoMatch.hasMatch()) {
-           emit appendLogSignal("❌ 未找到 div.positionInfo 容器");
-           continue;
-       }
-       QString posInfoHtml = posInfoMatch.captured(0).trimmed();
-       posInfoHtml.remove(QRegularExpression(R"(<span[^>]*>.*?</span>)")); // 移除span标签
-
-       //匹配<a...>后到</a>前的所有内容
-       QRegularExpression aTagRegex(
-           R"(<a\s+[^>]*>([\s\S]*?)</a>)",
-           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
-           );
-       QRegularExpressionMatch aTagMatch = aTagRegex.match(posInfoHtml);
-
-       if (aTagMatch.hasMatch()) {
-           QString rawName = aTagMatch.captured(1).trimmed();
-
-           communityName = rawName
-                               .remove(QRegularExpression(R"(\s+)"))       // 移除多余空格
-                               .replace("“", "").replace("”", "")          // 移除中文引号
-                               .replace("\"", "").replace("'", "");         // 移除英文引号
-           // 保留小区名中的合法特殊字符
-       } else {
-
-           int aTagStart = posInfoHtml.indexOf("<a");
-           if (aTagStart == -1) {
-               emit appendLogSignal("❌ positionInfo 内无 a 标签");
-               continue;
-           }
-           int aTagClose = posInfoHtml.indexOf(">", aTagStart);
-           int aTagEnd = posInfoHtml.indexOf("</a>", aTagClose); // 找</a>位置
-           if (aTagClose == -1 || aTagEnd == -1) {
-               emit appendLogSignal("❌ a 标签格式异常");
-               continue;
-           }
-
-           QString temp = posInfoHtml.mid(aTagClose + 1, aTagEnd - aTagClose - 1).trimmed();
-
-           temp = temp.remove(QRegularExpression(R"(\s+)")).replace("“", "").replace("”", "").replace("\"", "");
-           if (!temp.isEmpty()) {
-               communityName = temp;
-           } else {
-               emit appendLogSignal("❌ 未找到 a 标签内的有效文本");
-           }
-       }
-
-       if (!communityName.isEmpty()) {
-           emit appendLogSignal(QString("✅ 小区名提取成功：%1").arg(communityName));
-       } else {
-           emit appendLogSignal("❌ 小区名提取失败");
-       }
-
-       QRegularExpression totalPriceRegex(
-           R"(<div\s+class=["']totalPrice totalPrice2["']>.*?<span\s+class=["']*["']>(\s*[\d.]+)\s*</span>.*?<i>万</i>.*?</div>)",
-           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
-           );
-       QRegularExpressionMatch priceMatch = totalPriceRegex.match(houseHtml); // 只匹配一次，提升效率
-       if (priceMatch.hasMatch()) {
-           QString priceNum = priceMatch.captured(1).trimmed();
-           totalPrice = priceNum + " 万";
-
-       } else {
-           emit appendLogSignal("❌ 总价提取失败");
-       }
-
-
-       // 提取单价
-       QRegularExpression unitPriceRegex(
-           R"(<span\s*[^>]*>\s*([\d,.]+)\s*(元/平|元/㎡)</span>)",
-           QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
-           );
-       QRegularExpressionMatch unitPriceMatch = unitPriceRegex.match(houseHtml);
-       if (unitPriceMatch.hasMatch()) {
-           QString priceNum = unitPriceMatch.captured(1).trimmed();
-           unitPrice = priceNum + " 元/㎡";
-
-       } else {
-           emit appendLogSignal("❌ 单价提取失败");
-       }
-
-
-        // 提取楼层/建筑年代/户型/面积/朝向
-        QRegularExpression houseInfoRegex(R"(<div\s+class=["']houseInfo["'].*?>([\s\S]*?)</div>)", QRegularExpression::DotMatchesEverythingOption);
-        QString houseInfoHtml = houseInfoRegex.match(houseHtml).captured(1).trimmed();
-
-        floor = "未知";
-        buildingYear = "未知";
-        houseType = "未知";
-        area = "未知";
-        orientation = "未知";
-
-        if (!houseInfoHtml.isEmpty()) {
-            //清理文本
-            QString cleanHouseInfo = houseInfoHtml;
-            cleanHouseInfo.replace(QRegularExpression(R"(<[^>]+>)"), ""); // 删所有HTML标签
-            cleanHouseInfo.replace(QRegularExpression(R"(\n|\r)"), " "); // 换行符转为空格
-            cleanHouseInfo = cleanHouseInfo.trimmed();                   // 去首尾空格
-
-            emit appendLogSignal(QString("📋 清理后的houseInfo：%1").arg(cleanHouseInfo));
-
-
-            QRegularExpression floorRegex(
-                R"((底层|顶层|低楼层|中楼层|高楼层)\s*\(\s*共\d+层\s*\))", // 完整格式：底层 (共7层)
-                QRegularExpression::CaseInsensitiveOption
-                );
-            QRegularExpressionMatch floorMatch = floorRegex.match(cleanHouseInfo);
-            if (floorMatch.hasMatch()) {
-                floor = floorMatch.captured(0).trimmed();
-                //清理楼层的空格间距
-                floor = floor.replace(QRegularExpression(R"(\s+)"), "");
-                emit appendLogSignal(QString("✅楼层：%1").arg(floor));
-            } else {
-
-                QRegularExpression floorSimpleRegex(R"(底层|顶层|低楼层|中楼层|高楼层)");
-                if (floorSimpleRegex.match(cleanHouseInfo).hasMatch()) {
-                    floor = floorSimpleRegex.match(cleanHouseInfo).captured(0);
-                    emit appendLogSignal(QString("✅ 兜底匹配楼层：%1").arg(floor));
-                }
-            }
-
-            // 匹配户型
-            QRegularExpression houseTypeRegex(R"(\d+室\d+厅)", QRegularExpression::CaseInsensitiveOption);
-            if (houseTypeRegex.match(cleanHouseInfo).hasMatch()) {
-                houseType = houseTypeRegex.match(cleanHouseInfo).captured(0);
-                emit appendLogSignal(QString("✅户型：%1").arg(houseType));
-            }
-
-            // 匹配面积
-            QRegularExpression areaRegex(R"((\d+(\.\d+)?)平米)", QRegularExpression::CaseInsensitiveOption);
-            if (areaRegex.match(cleanHouseInfo).hasMatch()) {
-                QString areaNum = areaRegex.match(cleanHouseInfo).captured(1);
-                area = areaNum + " ㎡";
-                emit appendLogSignal(QString("✅面积：%1").arg(area));
-            }
-
-            //匹配建筑年代
-            QRegularExpression yearRegex(R"(\d{4}年)", QRegularExpression::CaseInsensitiveOption);
-            if (yearRegex.match(cleanHouseInfo).hasMatch()) {
-                buildingYear = yearRegex.match(cleanHouseInfo).captured(0);
-                emit appendLogSignal(QString("✅建筑年代：%1").arg(buildingYear));
-            }
-
-            //匹配“朝向”
-            QStringList dirWords = {"东南", "西南", "东北", "西北", "南", "北", "东", "西"}; // 长方向词优先（避免“东南”被拆为“东”+“南”）
-            QString dirResult = "";
-            foreach (QString dir, dirWords) {
-                if (cleanHouseInfo.contains(dir) && !dirResult.contains(dir)) {
-                    dirResult += dir + " ";
-                }
-            }
-            orientation = dirResult.trimmed().isEmpty() ? "未知" : dirResult.trimmed();
-            if (orientation != "未知") {
-                emit appendLogSignal(QString("✅朝向：%1").arg(orientation));
-            }
-
-
+        // ========== 标题提取：父容器+h3双重锁定（兼容所有3种样式） ==========
+        // 主正则：兼容title和class属性任意顺序，提取title属性值（优先级更高）
+        QRegularExpression titleRegex(
+            R"(<h3[^>]*?(?:title=["']([^"']+)["'][^>]*?class|class=["'][^"']*property-content-title-name[^"']*["'][^>]*?title=["']([^"']+)["'])[^>]*>.*?</h3>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatch titleMatch = titleRegex.match(houseHtml);
+        if (titleMatch.hasMatch()) {
+            // 捕获组1（title在前）或捕获组2（class在前），取非空值
+            QString title1 = titleMatch.captured(1).trimmed();
+            QString title2 = titleMatch.captured(2).trimmed();
+            title = !title1.isEmpty() ? title1 : title2;
+            // 清理连续空格（保留有效空格）
+            title.replace(QRegularExpression(R"(\s+)"), " ");
+            emit appendLogSignal(QString("✅ 标题提取成功：%1").arg(title));
         } else {
-            emit appendLogSignal("⚠️  未提取到 houseInfo 相关信息");
+            // 兜底：匹配带目标class的h3，提取标签内文本（兼容任意属性顺序）
+            QRegularExpression titleFallbackRegex(
+                R"(<h3[^>]*class=["'][^"']*property-content-title-name[^"']*["'][^>]*>(.*?)</h3>)",
+                QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+                );
+            QRegularExpressionMatch fallbackMatch = titleFallbackRegex.match(houseHtml);
+            if (fallbackMatch.hasMatch()) {
+                title = fallbackMatch.captured(1).trimmed();
+                title.replace(QRegularExpression(R"(\s+)"), " ");
+                emit appendLogSignal(QString("✅ 标题提取成功（来自标签内文本）：%1").arg(title));
+            } else {
+                emit appendLogSignal("❌ 未匹配到带property-content-title-name的h3标签");
+            }
         }
 
-        //提取房源链接
-        QRegularExpression urlRegex(R"(<a\s+.*?href=["']([^"']+)["'].*?>)", QRegularExpression::DotMatchesEverythingOption);
-        if (urlRegex.match(houseHtml).hasMatch()) {
-            houseUrl = urlRegex.match(houseHtml).captured(1).trimmed();
-            if (!houseUrl.startsWith("http")) houseUrl = "https://bj.ke.com" + houseUrl;
+        //小区名提取
+        QRegularExpression communityRegex(
+            R"(<p\s+[^>]*class=["'][^"']*?property-content-info-comm-name[^"']*?["'][^>]*>([\s\S]*?)</p>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatch communityMatch = communityRegex.match(houseHtml);
+        if (communityMatch.hasMatch()) {
+            communityName = communityMatch.captured(1).trimmed();
+            communityName.remove(QRegularExpression("<[^>]*>"));
+            communityName.replace(QRegularExpression(R"(\s+)"), " ");
+            emit appendLogSignal(QString("✅ 小区名提取成功：%1").arg(communityName));
+        } else {
+            emit appendLogSignal("❌ 小区名提取失败");
+            communityName = "未知";
         }
 
+        //总价提取
+        QRegularExpression totalPriceNumRegex(
+            R"(<span\s+[^>]*class=["'][^"']*?property-price-total-num[^"']*?["'][^>]*>([\d.]+)</span>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatch totalPriceNumMatch = totalPriceNumRegex.match(houseHtml);
+        if (totalPriceNumMatch.hasMatch()) {
+            QString priceNum = totalPriceNumMatch.captured(1).trimmed();
+            QRegularExpression totalPriceTextRegex(
+                R"(<span\s+[^>]*class=["'][^"']*?property-price-total-text[^"']*?["'][^>]*>(万)</span>)",
+                QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+                );
+            QRegularExpressionMatch unitMatch = totalPriceTextRegex.match(houseHtml);
+            QString priceUnit = unitMatch.hasMatch() ? unitMatch.captured(1).trimmed() : "";
+            totalPrice = priceNum + priceUnit;
+            emit appendLogSignal(QString("✅ 房源总价提取成功：%1").arg(totalPrice));
+        } else {
+            emit appendLogSignal("❌ 房源总价提取失败（未匹配到总价数字）");
+        }
 
-        //存储数据
-        if (!title.isEmpty() && !houseUrl.isEmpty() && !houseIdSet.contains(houseUrl)) {
+        //单价提取
+        QRegularExpression unitPriceRegex(
+            R"(<p\s+[^>]*class=["'][^"']*?property-price-average[^"']*?["'][^>]*>([\s\S]*?)</p>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatch unitPriceMatch = unitPriceRegex.match(houseHtml);
+        if (unitPriceMatch.hasMatch()) {
+            QString priceText = unitPriceMatch.captured(1).trimmed();
+            priceText.replace(QRegularExpression(R"(\s+)"), " ");
+            priceText = priceText.trimmed();
+            if (!priceText.isEmpty()) {
+                unitPrice = priceText;
+                emit appendLogSignal(QString("✅ 房源单价提取成功：%1").arg(unitPrice));
+            } else {
+                emit appendLogSignal("❌ 房源单价提取失败（提取文本为空）");
+            }
+        } else {
+            emit appendLogSignal("❌ 房源单价提取失败（未匹配到单价容器）");
+        }
+
+        // 户型提取
+        QRegularExpression houseTypeRegex(
+            R"(<p\s+[^>]*class=["'][^"']*property-content-info-text[^"']*property-content-info-attribute[^"']*["'][^>]*>([\s\S]*?)</p>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatch houseTypeMatch = houseTypeRegex.match(houseHtml);
+        if (houseTypeMatch.hasMatch()) {
+            QString typeHtml = houseTypeMatch.captured(1).trimmed();
+            typeHtml.remove(QRegularExpression("<span[^>]*>"));
+            typeHtml.remove(QRegularExpression("</span>"));
+            typeHtml.replace(QRegularExpression(R"(\s+)"), "");
+            typeHtml = typeHtml.trimmed();
+            if (!typeHtml.isEmpty()) {
+                houseType = typeHtml;
+                emit appendLogSignal(QString("✅ 户型提取成功：%1").arg(houseType));
+            } else {
+                emit appendLogSignal("❌ 户型提取失败（文本为空）");
+            }
+        } else {
+            emit appendLogSignal("❌ 户型提取失败（未匹配到户型容器）");
+        }
+
+        // 基础信息列表构建
+        QRegularExpression baseInfoRegex(
+            R"(<p\s+[^>]*class=["'][^"']*property-content-info-text[^"']*["'][^>]*>([\s\S]*?)</p>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+        QRegularExpressionMatchIterator baseInfoIt = baseInfoRegex.globalMatch(houseHtml);
+        QList<QString> baseInfoList;
+
+        while (baseInfoIt.hasNext()) {
+            QRegularExpressionMatch infoMatch = baseInfoIt.next();
+            QString infoHtml = infoMatch.captured(1).trimmed();
+            infoHtml.remove(QRegularExpression("<[^>]*>"));       // 移除所有HTML标签
+            infoHtml.replace(QRegularExpression(R"(\s+)"), " ");  // 多个空白替换为单个空格
+            infoHtml = infoHtml.trimmed();
+            if (!infoHtml.isEmpty()) {
+                baseInfoList.append(infoHtml);
+            }
+        }
+
+        // 调试日志：确认baseInfoList内容（保留）
+        emit appendLogSignal(QString("📝 基础信息列表长度：%1").arg(baseInfoList.size()));
+        for (int i = 0; i < baseInfoList.size(); i++) {
+            emit appendLogSignal(QString("📝 索引%1：%2").arg(i).arg(baseInfoList.at(i)));
+        }
+
+        // 定义朝向关键字列表
+        QStringList dirWords = {"东南", "西南", "东北", "西北", "南", "北", "东", "西"};
+
+        // ========== 关键修改2：改用带索引的for循环，获取元素索引值 + 成功提取数据 ==========
+        // 遍历baseInfoList，同时获取索引i和对应info（解决“获取索引值”需求）
+        for (int i = 0; i < baseInfoList.size(); i++) {
+            QString info = baseInfoList.at(i); // 当前元素
+            int currentIndex = i; // 当前元素的索引（你需要的索引值）
+
+            // 1. 提取面积（兼容数字与㎡之间有空格，同时打印索引）
+            if (area.isEmpty()) {
+                QRegularExpression areaFormatRegex(R"(^\d+(\.\d+)?\s*㎡$)");
+                QRegularExpressionMatch areaMatch = areaFormatRegex.match(info);
+                if (areaMatch.hasMatch()) {
+                    area = info;
+                    // 打印面积对应的索引值，满足你的需求
+                    emit appendLogSignal(QString("✅ 面积提取成功：%1 | 对应索引：%2").arg(area).arg(currentIndex));
+                    continue;
+                }
+            }
+
+            // 2. 提取朝向（兼容组合朝向，同时打印索引）
+            if (orientation.isEmpty()) {
+                bool isDirection = false;
+                foreach (QString dir, dirWords) {
+                    if (info.contains(dir)) {
+                        isDirection = true;
+                        orientation = info;
+                        break;
+                    }
+                }
+                if (isDirection) {
+                    // 打印朝向对应的索引值，满足你的需求
+                    emit appendLogSignal(QString("✅ 朝向提取成功：%1 | 对应索引：%2").arg(orientation).arg(currentIndex));
+                    continue;
+                }
+            }
+
+            // 3. 提取建造年份（兼容空格，同时打印索引）
+            if (buildingYear.isEmpty()) {
+                QRegularExpression yearRegex(R"(^\d{4}\s*年建造$)");
+                QRegularExpressionMatch yearMatch = yearRegex.match(info);
+                if (yearMatch.hasMatch()) {
+                    buildingYear = info;
+                    // 打印年份对应的索引值，满足你的需求
+                    emit appendLogSignal(QString("✅ 建造年份提取成功：%1 | 对应索引：%2").arg(buildingYear).arg(currentIndex));
+                    continue;
+                }
+            }
+
+            // 4. 提取楼层（同时打印索引）
+            if (floor.isEmpty()) {
+                QRegularExpression floorRegex(R"(\层)");
+                QRegularExpressionMatch floorMatch = floorRegex.match(info);
+                if (floorMatch.hasMatch()) {
+                    floor = info;
+                    // 打印楼层对应的索引值，满足你的需求
+                    emit appendLogSignal(QString("✅ 楼层提取成功：%1 | 对应索引：%2").arg(floor).arg(currentIndex));
+                    continue;
+                }
+            }
+        }
+
+        // ========== 关键修改3：提取完成后，给空变量赋值“未知”（兜底） ==========
+        if (area.isEmpty()) {
+            area = "未知";
+        }
+        if (orientation.isEmpty()) {
+            orientation = "未知";
+        }
+        if (floor.isEmpty()) {
+            floor = "未知";
+        }
+        if (buildingYear.isEmpty()) {
+            buildingYear = "未知";
+        }
+
+        // 原有提示逻辑（可保留，也可删除，不影响核心功能）
+        if (baseInfoList.size() >= 1) {
+            if (area == "未知") {
+                emit appendLogSignal(QString("⚠️  第1个基础信息非面积格式：%1").arg(baseInfoList.at(0)));
+            }
+        } else {
+            emit appendLogSignal(QString("⚠️  基础信息列表为空，无法提取面积"));
+        }
+
+        if (baseInfoList.size() >= 2) {
+            if (orientation == "未知") {
+                emit appendLogSignal(QString("⚠️  第2个基础信息非朝向格式：%1").arg(baseInfoList.at(1)));
+            }
+        } else if (baseInfoList.size() >= 1) {
+            emit appendLogSignal(QString("⚠️  基础信息列表长度不足2条，无法提取朝向"));
+        }
+
+        if (baseInfoList.size() >= 3) {
+            if (floor == "未知") {
+                emit appendLogSignal(QString("⚠️  第3个基础信息非楼层格式：%1").arg(baseInfoList.at(2)));
+            }
+            if (buildingYear == "未知") {
+                if (baseInfoList.size() >= 4) {
+                    emit appendLogSignal(QString("⚠️  第4个基础信息非建造年份格式：%1").arg(baseInfoList.at(3)));
+                } else {
+                    emit appendLogSignal(QString("⚠️  基础信息列表长度不足4条，无法提取建造年份"));
+                }
+            }
+        } else {
+            emit appendLogSignal(QString("⚠️  基础信息列表长度不足3条，无法提取楼层/建造年份"));
+        }
+
+        // ========== 链接提取（原有逻辑，保留） ==========
+        QRegularExpression urlRegex(
+            R"(<a\s+[^>]*?href=["']([^"']+)["'][^>]*>)",
+            QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption
+            );
+
+        QRegularExpressionMatch urlMatch = urlRegex.match(houseHtml);
+        if (urlMatch.hasMatch()) {
+            houseUrl = urlMatch.captured(1).trimmed();
+            if (!houseUrl.startsWith("http")) {
+                houseUrl = "https://beijing.anjuke.com" + houseUrl;
+            }
+            emit appendLogSignal(QString("✅ 提取链接成功：%1").arg(houseUrl));
+        } else {
+            emit appendLogSignal("❌ 链接提取失败）");
+        }
+
+        // ========== 过滤无效房源并存储 ==========
+        if (!title.isEmpty() && title != "未知" && !houseUrl.isEmpty() && !houseIdSet.contains(houseUrl)) {
             houseIdSet.insert(houseUrl);
             HouseData data;
             data.city = currentCity;
@@ -637,19 +757,17 @@ void Crawl::extractHouseData(const QString& html)
             houseDataList.append(data);
             extractCount++;
 
-            // 最终结果输出
-            QString floorAndOri = (floor != "未知" ? floor : "") + (orientation != "未知" ? " " + orientation : "");
-           emit appendLogSignal(QString("🎉 最终提取成功：小区=%1 | 总价=%2 | 户型=%3 | 面积=%4 | 楼层=%5")
-                                     .arg(communityName, totalPrice, houseType, area, floorAndOri));
+            emit appendLogSignal(QString("🎉 最终提取成功：小区=%1 | 总价=%2 | 户型=%3 | 面积=%4 | 朝向=%5")
+                                     .arg(communityName, totalPrice, houseType, area, orientation));
+        } else {
+            emit appendLogSignal("🚫 该房源无有效信息，已过滤");
         }
     }
 
     emit appendLogSignal(QString("\n📊 提取完成：共%1条有效房源").arg(extractCount));
-
 }
 
-
-// 处理房源页URL
+// 处理安居客房源页URL
 void Crawl::processSearchUrl()
 {
     if (searchUrlQueue.isEmpty()) {
@@ -666,14 +784,14 @@ void Crawl::processSearchUrl()
     QWebEngineHttpRequest request(url);
     QString randomUA = getRandomUA();
     request.setHeader(QByteArray("User-Agent"), randomUA.toUtf8());
-    request.setHeader(QByteArray("Referer"), QByteArray("https://www.ke.com/"));
+    request.setHeader(QByteArray("Referer"), QByteArray("https://www.anjuke.com/"));
     request.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
-    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
+    request.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br"));
     request.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8"));
     request.setHeader(QByteArray("Cache-Control"), QByteArray("no-cache"));
     request.setHeader(QByteArray("Connection"), QByteArray("keep-alive"));
     request.setHeader(QByteArray("Pragma"), QByteArray("no-cache"));
-    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\"")); // 更新版本
+    request.setHeader(QByteArray("Sec-Ch-Ua"), QByteArray("\"Chromium\";v=\"138\", \"Not=A?Brand\";v=\"8\", \"Google Chrome\";v=\"138\""));
     request.setHeader(QByteArray("Sec-Ch-Ua-Mobile"), QByteArray("?0"));
     request.setHeader(QByteArray("Sec-Ch-Ua-Platform"), QByteArray("\"Windows\""));
     request.setHeader(QByteArray("Sec-Fetch-Dest"), QByteArray("document"));
@@ -691,7 +809,7 @@ void Crawl::processSearchUrl()
     webPage->load(request);
 }
 
-// 展示房源对比结果
+// 展示房源对比结果（不变）
 void Crawl::showHouseCompareResult()
 {
     emit appendLogSignal("\n" + QString("=").repeated(60));
@@ -701,8 +819,8 @@ void Crawl::showHouseCompareResult()
     std::sort(houseDataList.begin(), houseDataList.end(), [](const HouseData& a, const HouseData& b) {
         QString priceA = a.price;
         QString priceB = b.price;
-        priceA = priceA.remove("万").remove(",").trimmed();
-        priceB = priceB.remove("万").remove(",").trimmed();
+        priceA.remove("万").remove(",").trimmed();
+        priceB.remove("万").remove(",").trimmed();
         return priceA.toDouble() < priceB.toDouble();
     });
 
@@ -713,7 +831,6 @@ void Crawl::showHouseCompareResult()
         emit appendLogSignal("🏘️  小区名称：" + data.communityName);
         emit appendLogSignal("💰 总价：" + data.price + " | 单价：" + data.unitPrice);
         emit appendLogSignal("📐 户型/面积：" + data.houseType + " / " + data.area);
-
 
         QString floorAndOri = "";
         if (data.floor != "未知" && data.orientation != "未知") {
@@ -743,20 +860,19 @@ void Crawl::showHouseCompareResult()
         int validPriceCount = 0;
         for (auto& house : houseDataList) {
             QString priceStr = house.price;
-            priceStr = priceStr.remove("万").remove(",").trimmed();
+            priceStr.remove("万").remove(",").trimmed();
             bool ok;
             double price = priceStr.toDouble(&ok);
             if (ok) {
                 totalPriceSum += price;
                 validPriceCount++;
             }
-            //插入数据到数据库
-           // mysql->insertInfo(house);
+            //mysql->insertInfo(house);
         }
 
         if (validPriceCount > 0) {
             double avgPrice = totalPriceSum / validPriceCount;
-          emit appendLogSignal("✅ 房源均价：" + QString::number(avgPrice, 'f', 1) + " 万");
+            emit appendLogSignal("✅ 房源均价：" + QString::number(avgPrice, 'f', 1) + " 万");
         }
 
         QMap<QString, int> houseTypeCount;
@@ -765,64 +881,78 @@ void Crawl::showHouseCompareResult()
         }
         emit appendLogSignal("✅ 户型分布：");
         for (auto it = houseTypeCount.begin(); it != houseTypeCount.end(); it++) {
-           emit appendLogSignal("   " + it.key() + "：" + QString::number(it.value()) + "套");
+            emit appendLogSignal("   " + it.key() + "：" + QString::number(it.value()) + "套");
         }
     }
 
     emit appendLogSignal("\n=== 房源对比完成（低风控模式）===");
 }
 
-void Crawl::startHouseCrawl(const QString& city, int targetPages)
+// 启动安居客爬取（核心修改：URL适配安居客）
+void Crawl::startHouseCrawl(const QString& cityWithDistrict, int targetPages)
 {
-    currentCity = city.trimmed(); // 用 Crawl 类内成员 currentCity 替代全局变量
-    if (currentCity.isEmpty()) {
-        emit appendLogSignal("❌ 错误：请输入城市名！（如：北京、上海、广州）");
+    // ========== 1. 拆分城市/区县 ==========
+    QStringList cityDistrictParts = cityWithDistrict.split("-", Qt::SkipEmptyParts);
+    QString pureCityName = cityDistrictParts.size() >= 1 ? cityDistrictParts[0].trimmed() : "";
+    QString districtName = cityDistrictParts.size() >= 2 ? cityDistrictParts[1].trimmed() : "";
+
+    // 基础校验
+    if (pureCityName.isEmpty()) {
+        emit appendLogSignal("❌ 输入格式错误！请输入：城市名 或 城市名-区县名（示例：北京 或 北京-朝阳区）");
         return;
     }
 
-    // 页数限制最多2页
-    targetPageCount = targetPages;
-    if (targetPageCount < 1) {
-        targetPageCount = 1;
-        emit appendLogSignal("⚠️  页码不能小于1，已自动调整为第1页");
-    }
-    if (targetPageCount > 5) {
-        targetPageCount = 5;
-        emit appendLogSignal("⚠️  风控限制：目标页码最大为5，已自动调整为第5页");
+    // ========== 2. 页码风控限制 ==========
+    targetPageCount = qBound(1, targetPages, 5);
+    if (targetPageCount != targetPages) {
+        emit appendLogSignal(QString("⚠️  风控调整：页码%1超出范围（1-5），自动修正为%2").arg(targetPages).arg(targetPageCount));
     }
 
+    // ========== 3. 清空历史数据 ==========
+    searchUrlQueue.clear();
+    houseDataList.clear();
+    houseIdSet.clear();
+    currentPageCount = 0;
+    isProcessingSearchTask = true;
 
-    //清空旧数据
-    searchUrlQueue.clear();    // 搜索URL队列
-    houseDataList.clear();     // 房源数据列表
-    houseIdSet.clear();        // 房源ID去重集合
-    currentPageCount = 0;      // 当前已爬页数
-    isProcessingSearchTask = true; // 搜索任务标志位
+    // ========== 4. 获取城市/区域拼音 ==========
+    QString cityPinyin = regionToCode(pureCityName, "");
+    QString districtPinyin = regionToCode(pureCityName, districtName);
+    if (cityPinyin.isEmpty()) {
+        emit appendLogSignal("❌ 无法获取「" + pureCityName + "」的城市拼音，终止爬取！");
+        isProcessingSearchTask = false;
+        return;
+    }
 
-    emit appendLogSignal("=== 低风控模式：爬取「" + currentCity + "」二手房房源（第" + QString::number(targetPageCount) + "页）===");
+    // ========== 5. 生成安居客URL（核心修改：https://bj.anjuke.com/sale/pg1/） ==========
+    QString houseUrl;
+    if (!districtName.isEmpty() && !districtPinyin.isEmpty()) {
+        // 区级URL：https://bj.anjuke.com/sale/chaoyang/pg1/
+        houseUrl = QString("https://%1.anjuke.com/sale/%2/p%3/")
+                       .arg(cityPinyin)
+                       .arg(districtPinyin)
+                       .arg(targetPageCount);
+    } else {
+        // 城市级URL：https://bj.anjuke.com/sale/pg1/
+        houseUrl = QString("https://%1.anjuke.com/sale/p%2/")
+                       .arg(cityPinyin)
+                       .arg(targetPageCount);
+    }
+
+    // ========== 6. 日志输出 + 入队URL ==========
+    QString crawlScope = districtName.isEmpty() ? pureCityName : QString("%1-%2").arg(pureCityName, districtName);
+    emit appendLogSignal("=== 低风控模式：爬取「" + crawlScope + "」二手房房源（第" + QString::number(targetPageCount) + "页）===");
     emit appendLogSignal("⚠️  风控提醒：单次只爬1页，目标页码范围1-5！");
-    emit appendLogSignal("⚠️  请确保ke_cookies.txt中的Cookie是登录后最新抓取的！");
+    emit appendLogSignal("⚠️  请确保ke_cookies.txt中的Cookie是安居客登录后最新抓取的！");
     emit appendLogSignal("————————————————");
-
-    // 城市名转拼音（
-    QString cityPinyin = cityToPinyin(currentCity);
-    emit appendLogSignal("🏙️  城市拼音转换：" + currentCity + " → " + cityPinyin);
-
-    //生成待爬取房源页 URL
-    QString pvid = generateRandomPvid();
-    QString logId = generateLogId();
-    // 页码直接用 targetPageCount（目标页码）
-    QString houseUrl = QString("https://%1.ke.com/ershoufang/pg%2/?pvid=%3&log_id=%4")
-                           .arg(cityPinyin)
-                           .arg(targetPageCount) // 这里用目标页码，不是循环变量
-                           .arg(pvid)
-                           .arg(logId);
-    searchUrlQueue.enqueue(houseUrl);
+    emit appendLogSignal("🏙️  拼音映射：" + crawlScope + " → 城市拼音：" + cityPinyin + (districtPinyin.isEmpty() ? "" : " | 区域拼音：" + districtPinyin));
     emit appendLogSignal("📌 待爬取房源页：" + houseUrl);
 
+    searchUrlQueue.enqueue(houseUrl);
 
-    emit appendLogSignal("🏠 第一步：先访问贝壳首页建立会话...");
-    QString homeUrl = "https://www.ke.com/";
+    // ========== 7. 访问安居客首页建立会话 ==========
+    emit appendLogSignal("🏠 第一步：先访问安居客首页建立会话...");
+    QString homeUrl = "https://www.anjuke.com/"; // 安居客首页
     QWebEngineHttpRequest homeRequest(homeUrl);
     QString homeUA = getRandomUA();
 
@@ -830,24 +960,20 @@ void Crawl::startHouseCrawl(const QString& city, int targetPages)
     homeRequest.setHeader(QByteArray("User-Agent"), homeUA.toUtf8());
     homeRequest.setHeader(QByteArray("Referer"), QByteArray(""));
     homeRequest.setHeader(QByteArray("Accept"), QByteArray("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"));
-    homeRequest.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br")); // 移除zstd
+    homeRequest.setHeader(QByteArray("Accept-Encoding"), QByteArray("gzip, deflate, br"));
     homeRequest.setHeader(QByteArray("Accept-Language"), QByteArray("zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"));
 
-    // 携带 Cooki
+    // 携带Cookie
     if (!cookieStr.isEmpty()) {
         homeRequest.setHeader(QByteArray("Cookie"), cookieStr.toUtf8());
     }
 
-    // 启动首页加载（
-    webPage->load(homeRequest); // QWebEnginePage 实例
-    isHomeLoadedForSearch = true; //首页加载标志
-    pendingSearchKeyword = currentCity; //待搜索关键词
+    // 启动首页加载
+    webPage->load(homeRequest);
+    isHomeLoadedForSearch = true;
+    pendingSearchKeyword = crawlScope;
+    currentCity = crawlScope;
 }
 
-/*void Crawl::IntoDB()
-{
-    for(const auto& data: houseDataList){
-        mysql->insertInfo(data);
-    }
-}*/
+
 

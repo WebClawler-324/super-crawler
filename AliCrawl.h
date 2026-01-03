@@ -43,12 +43,15 @@ private:
     QString generateLogId();
     QString getRandomUA();
     int getRandomInterval();
+    // 补充类声明（需添加到AliCrawl.h中）
+    QMap<QString, QMap<QString, QString>>getRegionCodeMap();
+    QString regionToCode(const QString& cityName, const QString& districtName);
 
 public:
     explicit AliCrawl(MainWindow *mainWindow, QWebEnginePage *webPage, Ui::MainWindow* ui);
     ~AliCrawl() override;
 
-    QString cityToPinyin(const QString& cityName);
+    //QString cityToPinyin(const QString& cityName);
     QString getFirstLetter(int index);
     void extractHouseData(const QString& html);
     void showHouseCompareResult();

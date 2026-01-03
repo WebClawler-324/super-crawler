@@ -15,6 +15,7 @@ class MainWindow; // 前向声明 MainWindow（仅用指针，不包含头文件
 namespace Ui { class MainWindow; } // 前向声明 UI 命名空间（替代 #include "ui_mainwindow.h"）
 
 #include "HouseData.h" // 包含房源数据结构体（必须在前面声明之后）
+#include "LLMClient.h"
 
 class Crawl : public QObject
 {
@@ -50,9 +51,28 @@ private:
     // 搜索任务标志位（直接初始化）
     bool isProcessingSearchTask = false;
 
+    //添加 LLMClient 成员变量（大模型客户端）
+    LLMClient *m_llmClient;
+
     //把房子数据写入数据库
     Mysql *mysql;
     void IntoDB();
+
+    // 新增：区域相关函数声明
+     QMap<QString, QMap<QString, QString>> getRegionCodeMap(); // 区域映射表
+     QString regionToCode(const QString& cityName, const QString& regionName); // 区域转编码
+
+     // 分步加载状态枚举
+     enum LoadStep {
+         Step_LoadHome,    // 第一步：加载贝壳首页
+         Step_LoadCity,    // 第二步：加载城市房源页（仅区级需要）
+         Step_LoadTarget   // 第三步：加载目标房源页
+     };
+
+     QString cityHouseUrl;           // 城市级房源页URL（区级爬取时用）
+     bool isCityPageLoading; // 标记当前是否在加载城市页（新增）
+     bool isDistrictPageLoading; // 标记当前是否在加载区级页（新增）
+     int loadStep = 0;
 
 public:
     // 构造函数（参数不变，保持与实现一致）
@@ -73,9 +93,13 @@ public:
     static const int MIN_REQUEST_INTERVAL;
     static const int MAX_REQUEST_INTERVAL;
     static const QStringList USER_AGENT_POOL;
+    static const int MIN_INTER_PAGE_DELAY ;  // 分页间最小延迟30秒
+    static const int MAX_INTER_PAGE_DELAY ;  // 分页间最大延迟45秒
+    static const int MIN_PAGE_STAY_TIME;    // 每页最小停留15秒
+    static const int MAX_PAGE_STAY_TIME;    // 每页最大停留25秒
 
     QQueue<QString> getSearchUrl(){
-      return searchUrlQueue;
+        return searchUrlQueue;
     }
 
     int getCurrentPage(){
