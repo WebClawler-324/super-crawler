@@ -701,8 +701,8 @@ void Crawl::showHouseCompareResult()
     std::sort(houseDataList.begin(), houseDataList.end(), [](const HouseData& a, const HouseData& b) {
         QString priceA = a.price;
         QString priceB = b.price;
-        priceA.remove("万").remove(",").trimmed();
-        priceB.remove("万").remove(",").trimmed();
+        priceA = priceA.remove("万").remove(",").trimmed();
+        priceB = priceB.remove("万").remove(",").trimmed();
         return priceA.toDouble() < priceB.toDouble();
     });
 
@@ -743,7 +743,7 @@ void Crawl::showHouseCompareResult()
         int validPriceCount = 0;
         for (auto& house : houseDataList) {
             QString priceStr = house.price;
-            priceStr.remove("万").remove(",").trimmed();
+            priceStr = priceStr.remove("万").remove(",").trimmed();
             bool ok;
             double price = priceStr.toDouble(&ok);
             if (ok) {

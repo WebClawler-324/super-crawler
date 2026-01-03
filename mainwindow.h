@@ -12,6 +12,7 @@
 #include "Crawl.h"
 #include "AliCrawl.h"
 #include "CrawlThreadManager.h"
+#include "MYSQL.h"
 #include <QThread>
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -29,8 +30,13 @@ private slots:
 
     void on_pushButton_clicked();                        // 启动
     void on_searchCompareBtn_clicked();                  // 搜索对比按钮（城市二手房）
+    void on_analyzeBtn_clicked();                        // AI分析按钮
+    void on_clearAnalysisBtn_clicked();                  // 清空分析按钮
+    void on_askQuestionBtn_clicked();                    // 询问按钮
     void updateLog(const QString& log);
     void AliLog(const QString &log);
+    void onAnalysisCompleted(const QString& result);     // AI分析完成回调
+    void onQuestionAnswered(const QString& result);     // AI问答完成回调
     // 接收日志并显示到UI
   //  void showLog(const QString& log);
 
@@ -42,6 +48,9 @@ private:
     QThread *aliCrawlThread; // 对应 AliCrawl 实例（a_crawl）
     Crawl* m_crawl;
     AliCrawl* a_crawl;
+
+    // AI对话相关
+    Mysql* m_database;
     // 辅助函数：创建独立的 QWebEnginePage（每个爬虫单独用，避免冲突）
     QWebEnginePage* createWebEnginePage();
 

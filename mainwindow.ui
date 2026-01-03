@@ -172,6 +172,112 @@
        </font>
       </property>
      </widget>
+     <widget class="QGroupBox" name="aiAnalysisGroup">
+      <property name="geometry">
+       <rect>
+        <x>780</x>
+        <y>10</y>
+        <width>411</width>
+        <height>761</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>AI智能分析</string>
+      </property>
+      <widget class="QPushButton" name="analyzeBtn">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>30</y>
+         <width>121</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>生成分析报告</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="clearAnalysisBtn">
+       <property name="geometry">
+        <rect>
+         <x>140</x>
+         <y>30</y>
+         <width>81</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>清空</string>
+       </property>
+      </widget>
+      <widget class="QLineEdit" name="questionInput">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>85</y>
+         <width>301</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
+       <property name="placeholderText">
+        <string>请输入您的问题</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="askQuestionBtn">
+       <property name="geometry">
+        <rect>
+         <x>320</x>
+         <y>85</y>
+         <width>81</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>询问</string>
+       </property>
+      </widget>
+      <widget class="QTextEdit" name="aiAnalysisText">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>125</y>
+         <width>391</width>
+         <height>626</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
+       <property name="placeholderText">
+        <string>AI分析报告将显示在这里...</string>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </widget>
     </widget>
    </widget>
   </widget>

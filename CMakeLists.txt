@@ -64,29 +64,32 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         ${GUMBO_SOURCES}
-        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/ke_cookies.txt
-        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/h5st_encrypt.js
-        Test.html
         Crawl.h
         Crawl.cpp
         HouseData.h
-        LLMClient.h
-        LLMClient.cpp
+        DeepSeekClient.h
+        DeepSeekClient.cpp
         MYSQL.h
         MYSQL.cpp
+        TaxCalculator.h
+        TaxCalculator.cpp
+        AIDataInterface.h
+        AIDataInterface.cpp
         AliCrawl.h
         AliCrawl.cpp
         HouseInfo.h
         CrawlThreadManager.h
 
-        ali_cookies.txt
-        build/Desktop_Qt_6_9_3_MSVC2022_64bit-Debug/ali_cookies.txt
 
 
 
 
 
-        # Gumbo源码必须加入编译
+        house_intent_config.txt
+        house_intent_model.cpp
+        house_intent_model.h
+        preprocessor.cpp
+        preprocessor.h
     )
 else()
     if(ANDROID)
@@ -109,7 +112,7 @@ target_link_libraries(WebCrawler PRIVATE
     Qt${QT_VERSION_MAJOR}::WebEngineWidgets  # 关键：链接WebEngine
     Qt${QT_VERSION_MAJOR}::Sql
 )
-target_include_directories(own PRIVATE
+target_include_directories(WebCrawler PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen
 )
 

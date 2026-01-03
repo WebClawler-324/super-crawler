@@ -694,7 +694,7 @@ void AliCrawl::showHouseCompareResult() {
             if (temp == "未知" || !temp.contains(QRegularExpression(R"(\d+)"))) {
                 return 1e18; // 未知价格排最后
             }
-            temp.remove("万").remove(",").remove(" ").trimmed();
+            temp = temp.remove("万").remove(",").remove(" ").trimmed();
             bool ok;
             double price = temp.toDouble(&ok);
             return ok ? price : 1e18;
@@ -741,7 +741,7 @@ void AliCrawl::showHouseCompareResult() {
             // 统计总价
             QString priceStr = house.price;
             if (priceStr != "未知" && priceStr.contains(QRegularExpression(R"(\d+)"))) {
-                priceStr.remove("万").remove(",").remove(" ").trimmed();
+                priceStr = priceStr.remove("万").remove(",").remove(" ").trimmed();
                 bool ok;
                 double price = priceStr.toDouble(&ok);
                 if (ok) {
@@ -753,7 +753,7 @@ void AliCrawl::showHouseCompareResult() {
             // 统计单价（新增）
             QString unitPriceStr = house.unitPrice;
             if (unitPriceStr != "未知" && unitPriceStr != "计算失败" && unitPriceStr.contains(QRegularExpression(R"(\d+)"))) {
-                unitPriceStr.remove("元/㎡").remove(",").remove(" ").trimmed();
+                unitPriceStr = unitPriceStr.remove("元/㎡").remove(",").remove(" ").trimmed();
                 bool ok;
                 double unitPrice = unitPriceStr.toDouble(&ok);
                 if (ok) {

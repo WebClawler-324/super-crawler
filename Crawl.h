@@ -15,7 +15,6 @@ class MainWindow; // 前向声明 MainWindow（仅用指针，不包含头文件
 namespace Ui { class MainWindow; } // 前向声明 UI 命名空间（替代 #include "ui_mainwindow.h"）
 
 #include "HouseData.h" // 包含房源数据结构体（必须在前面声明之后）
-#include "LLMClient.h"
 
 class Crawl : public QObject
 {
@@ -50,9 +49,6 @@ private:
 
     // 搜索任务标志位（直接初始化）
     bool isProcessingSearchTask = false;
-
-    //添加 LLMClient 成员变量（大模型客户端）
-    LLMClient *m_llmClient;
 
     //把房子数据写入数据库
     Mysql *mysql;
